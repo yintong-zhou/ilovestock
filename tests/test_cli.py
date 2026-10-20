@@ -1,0 +1,119 @@
+"""Config precedence, inputs, and the CLI end to end on recorded data (offline)."""
+
+import pytest
+from rich.console import Console
+from typer.testing import CliRunner
+
+from ilovestock import cli, config, inputs
+from ilovestock.models import DISCLAIMER
+
+runner = CliRunner()
+
+
+# --- config ---
+def test_precedence_default_file_cli(tmp_path):
+    path = tmp_path / "c.toml"
+    assert config.load(path).capital == 20000  # course default
+    path.write_text("[portfolio]\ncapital = 5000\nrisk_pct = 0.5\n")
+    cfg = config.load(path)
+    assert (cfg.capital, cfg.risk_pct, cfg.r_multiple) == (5000, 0.5, 3)  # file > default
+    cfg = config.load(path, {"capital": 7000, "risk_pct": None})
+    assert (cfg.capital, cfg.risk_pct) == (7000, 0.5)  # CLI > file; None = not given
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "[portfolio]\nrisk_pct = 3\n",  # course hard limit
+        "[portfolio]\nfoo = 1\n",
+        "[nope]\nx = 1\n",
+        '[portfolio]\ncapital = "a lot"\n',
+        "[plan]\nentry_mode = 'yolo'\n",
+        "not toml ===",
+    ],
+)
+def test_invalid_config_rejected(tmp_path, text):
+    path = tmp_path / "c.toml"
+    path.write_text(text)
+    with pytest.raises(config.ConfigError):
+        config.load(path)
+
+
+def test_dump_roundtrip(tmp_path):
+    path = tmp_path / "c.toml"
+    path.write_text(config.dump(config.load(path, {"capital": 1234.5})))
+    assert config.load(path).capital == 1234.5
+
+
+# --- inputs ---
+def test_watchlist_txt_and_csv(tmp_path):
+    txt = tmp_path / "w.txt"
+    txt.write_text("hzo\n\n# comment\nNIO  # inline\n")
+    csv = tmp_path / "w.csv"
+    csv.write_text('Ticker,Name\n"AAPL",Apple\nmsft,Microsoft\n')
+    assert inputs.read_watchlist(txt) == ["HZO", "NIO"]
+    assert inputs.read_watchlist(csv) == ["AAPL", "MSFT"]
+
+
+def test_invalid_ticker_rejected():
+    with pytest.raises(ValueError):
+        inputs.normalize("not a ticker")
+
+
+def test_merge_dedupes_in_order():
+    assert inputs.merge(["A", "B"], ["B", "C"], ["A", "D"]) == ["A", "B", "C", "D"]
+
+
+# --- CLI ---
+@pytest.fixture
+def offline(monkeypatch, fake_yf, tmp_path):
+    monkeypatch.setattr(cli, "CachedProvider", lambda p: p)
+    monkeypatch.setattr(cli, "console", Console(width=200))
+    monkeypatch.setattr(cli.finviz, "institutional", lambda t: (50.0, 1.0, ""))
+    monkeypatch.setattr(cli.finviz, "screener_tickers", lambda url: ["SCRN", "HZO"])
+    monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    return tmp_path
+
+
+def test_help():
+    result = runner.invoke(cli.app, ["--help"])
+    assert result.exit_code == 0 and "analyze" in result.output
+
+
+def test_analyze_combines_three_inputs(offline):
+    wl = offline / "w.txt"
+    wl.write_text("HZO\nWLST\n")
+    result = runner.invoke(
+        cli.app,
+        ["analyze", "HZO", "--watchlist", str(wl), "--finviz-url", "https://finviz.com/x"],
+    )
+    assert result.exit_code == 0, result.output
+    rows = [line.split("│")[1].strip() for line in result.output.splitlines() if "NO-BUY" in line]
+    assert rows == ["HZO", "WLST", "SCRN"]  # union, deduplicated, input order
+    assert "Errore dati" in result.output  # WLST/SCRN have no recorded data: reported, not crashed
+    assert DISCLAIMER in result.output.replace("\n", " ")
+
+
+def test_analyze_detail_shows_criteria(offline):
+    result = runner.invoke(cli.app, ["analyze", "HZO", "--detail"])
+    assert result.exit_code == 0, result.output
+    for text in ("Crescita vendite QOQ", "DMI 18d", "Piano di trade", "Prossimi earnings"):
+        assert text in result.output
+
+
+def test_analyze_rejects_risk_above_2(offline):
+    result = runner.invoke(cli.app, ["analyze", "HZO", "--risk-pct", "2.5"])
+    assert result.exit_code == 1 and "risk_pct" in result.output
+
+
+def test_analyze_needs_tickers(offline):
+    assert runner.invoke(cli.app, ["analyze"]).exit_code == 1
+
+
+def test_config_init_show_path(offline):
+    assert runner.invoke(cli.app, ["config", "init"]).exit_code == 0
+    assert runner.invoke(cli.app, ["config", "init"]).exit_code == 1  # no silent overwrite
+    show = runner.invoke(cli.app, ["config", "show"])
+    assert show.exit_code == 0 and "capital = 20000" in show.output
+    path = runner.invoke(cli.app, ["config", "path"])
+    assert "config.toml" in path.output

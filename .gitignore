@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Intermediates (rigenerabili)
+.tmp/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Frontend
+web/node_modules/
+web/dist/

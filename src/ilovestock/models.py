@@ -1,0 +1,71 @@
+"""Data models shared by core, CLI and (later) the web API."""
+
+from dataclasses import dataclass, field
+from datetime import date
+from enum import StrEnum
+
+DISCLAIMER = "Strumento educativo di screening, non è consulenza finanziaria."
+
+
+class Status(StrEnum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    ND = "N/D"
+
+
+class Verdict(StrEnum):
+    BUY = "BUY"
+    NO_BUY = "NO-BUY"
+
+
+@dataclass
+class CriterionResult:
+    name: str
+    status: Status
+    value: float | str | None
+    threshold: str
+    note: str = ""
+
+
+@dataclass
+class Fundamentals:
+    """Raw fundamental inputs. None = missing data (-> N/D, never PASS)."""
+
+    sales: list[float | None]  # quarterly, most recent first
+    eps: list[float | None]  # quarterly diluted EPS, most recent first
+    roe_pct: float | None
+    market_cap: float | None
+    next_earnings: date | None
+    inst_own_pct: float | None = None
+    inst_trans_pct: float | None = None
+    inst_note: str = ""  # why institutional data is missing
+
+
+@dataclass
+class TradePlan:
+    entry: float
+    stop: float
+    target: float | None = None
+    shares: int = 0
+    max_loss: float = 0.0
+    effective_risk: float = 0.0
+    position_value: float = 0.0
+    binding: str = ""  # "rischio" or "esposizione": which constraint set the shares
+    risk_band: str = ""
+    trailing_stop_10w: float | None = None
+    trailing_stop_8w: float | None = None
+    discarded: str | None = None  # reason the trade is not valid
+    info: list[str] = field(default_factory=list)  # informational, non-blocking
+
+
+@dataclass
+class TickerAnalysis:
+    ticker: str
+    verdict: Verdict
+    reasons: list[str] = field(default_factory=list)
+    fundamental: list[CriterionResult] = field(default_factory=list)
+    technical: list[CriterionResult] = field(default_factory=list)
+    earnings: CriterionResult | None = None
+    plan: TradePlan | None = None
+    data_date: date | None = None
+    error: str | None = None
