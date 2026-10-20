@@ -23,7 +23,7 @@ r_multiple = 3           # take profit in R; below 2 -> trade discarded
 entry_mode = "breakout"  # breakout | pullback | restart
 
 [fundamental]
-growth_basis = "qoq"     # qoq (vs previous quarter) | yoy (vs same quarter last year)
+growth_basis = "yoy"     # yoy (Finviz, vs same quarter a year ago) | qoq (Yahoo, vs last quarter)
 sales_growth_min = 20
 eps_growth_min = 15
 roe_min = 15
@@ -66,21 +66,21 @@ class Config:
             v = getattr(self, f.name)
             ok = isinstance(v, str) if f.type is str else type(v) in (int, float)
             if not ok:
-                raise ConfigError(f"{f.name}: valore non valido {v!r}")
+                raise ConfigError(f"{f.name}: invalid value {v!r}")
         if self.capital <= 0:
-            raise ConfigError("capital deve essere > 0")
+            raise ConfigError("capital must be > 0")
         if not 0 < self.risk_pct <= MAX_RISK_PCT:
             raise ConfigError(
-                f"risk_pct {self.risk_pct} rifiutato: deve essere > 0 e <= {MAX_RISK_PCT}"
+                f"risk_pct {self.risk_pct} rejected: must be > 0 and <= {MAX_RISK_PCT}"
             )
         if not 0 < self.max_position_pct <= 100:
-            raise ConfigError("max_position_pct deve essere tra 0 e 100")
+            raise ConfigError("max_position_pct must be between 0 and 100")
         if self.r_multiple <= 0:
-            raise ConfigError("r_multiple deve essere > 0")
+            raise ConfigError("r_multiple must be > 0")
         if self.entry_mode not in ENTRY_MODES:
-            raise ConfigError(f"entry_mode deve essere uno di {ENTRY_MODES}")
+            raise ConfigError(f"entry_mode must be one of {ENTRY_MODES}")
         if self.growth_basis not in GROWTH_BASES:
-            raise ConfigError(f"growth_basis deve essere uno di {GROWTH_BASES}")
+            raise ConfigError(f"growth_basis must be one of {GROWTH_BASES}")
 
 
 def load(path: Path | None = None, overrides: dict | None = None) -> Config:
@@ -91,13 +91,13 @@ def load(path: Path | None = None, overrides: dict | None = None) -> Config:
         try:
             file = tomllib.loads(path.read_text(encoding="utf-8"))
         except tomllib.TOMLDecodeError as e:
-            raise ConfigError(f"{path}: TOML non valido: {e}") from e
+            raise ConfigError(f"{path}: invalid TOML: {e}") from e
         for section, items in file.items():
             if section not in DEFAULTS or not isinstance(items, dict):
-                raise ConfigError(f"{path}: sezione sconosciuta [{section}]")
+                raise ConfigError(f"{path}: unknown section [{section}]")
             for k, v in items.items():
                 if k not in DEFAULTS[section]:
-                    raise ConfigError(f"{path}: chiave sconosciuta {section}.{k}")
+                    raise ConfigError(f"{path}: unknown key {section}.{k}")
                 values[k] = v
     for k, v in (overrides or {}).items():
         if v is not None:

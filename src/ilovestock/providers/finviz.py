@@ -1,23 +1,40 @@
-"""Finviz adapter: institutional data (via the `finviz` lib) and screener ticker import.
+"""Finviz: main source for fundamentals (via the `finviz` lib) and screener ticker import.
 
-Optional dependency (`pip install ilovestock[finviz]`). Unofficial scraping: Finviz ToS may
-forbid it, quotes are delayed 15-20 min. On any failure we return None -> N/D, never a guess.
+Finviz has no price history, so prices come from the fallback provider (Yahoo). Each
+fundamental field falls back to Yahoo when Finviz lacks it; the source is recorded per field.
+Unofficial scraping: Finviz ToS may forbid it, quotes are delayed 15-20 min.
 """
 
+import dataclasses
 import re
+from datetime import date, datetime
 
+import finviz
+import pandas as pd
 import requests
 
+from ilovestock.models import Fundamentals
+from ilovestock.providers.base import MarketDataProvider
+
 WARNING = (
-    "Finviz: fonte non ufficiale (scraping), l'uso può violare i ToS di Finviz; "
-    "quotazioni ritardate 15-20 min."
+    "Finviz: unofficial source (scraping), use may violate Finviz ToS; quotes delayed 15-20 min."
 )
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 PAGE_SIZE = 20
+SUFFIX = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
 
-# Keys verified on a real get_stock() response (tests/fixtures/HZO_finviz.json).
-INST_OWN = "Inst Own"
-INST_TRANS = "Inst Trans"
+# Keys and formats verified on real get_stock() responses (tests/fixtures/*_finviz.json).
+# Finviz "Q/Q" growth fields are YoY (same quarter last year), per Finviz help.
+KEYS = {
+    "sales_growth_yoy_pct": "Sales Q/Q",  # "-6.98%"
+    "eps_growth_yoy_pct": "EPS Q/Q",  # "127.37%"
+    "roe_pct": "ROE",  # "0.42%"
+    "inst_own_pct": "Inst Own",  # "82.64%"
+    "inst_trans_pct": "Inst Trans",  # "-1.02%"
+}
+MARKET_CAP = "Market Cap"  # "1.15B"
+DIVIDEND = "Dividend TTM"  # "1.06 (0.31%)"; "-" when none or missing
+EARNINGS = "Earnings"  # "Nov 02 AMC": no year; may be the last report, not the next
 
 
 class FinvizError(Exception):
@@ -34,17 +51,66 @@ def _pct(value: str | None) -> float | None:
         return None
 
 
-def institutional(ticker: str) -> tuple[float | None, float | None, str]:
-    """(inst_own_pct, inst_trans_pct, note). Note explains why values are missing."""
-    try:
-        import finviz
-    except ImportError:
-        return None, None, "finviz non installato (pip install ilovestock[finviz])"
-    try:
-        data = finviz.get_stock(ticker)
-    except Exception as e:  # scraping: any site change surfaces here
-        return None, None, f"errore Finviz: {e}"
-    return _pct(data.get(INST_OWN)), _pct(data.get(INST_TRANS)), ""
+def _money(value: str | None) -> float | None:
+    """'1.15B' -> 1.15e9."""
+    m = re.fullmatch(r"([\d.]+)([KMBT])", (value or "").strip())
+    return float(m.group(1)) * SUFFIX[m.group(2)] if m else None
+
+
+def _dividend_yield(value: str | None) -> float | None:
+    """'1.06 (0.31%)' -> 0.31. '-' -> None: Finviz does not tell 'none' from 'missing'."""
+    m = re.search(r"\(([\d.]+)%\)", value or "")
+    return float(m.group(1)) if m else None
+
+
+def _earnings_date(value: str | None, today: date) -> date | None:
+    """'Nov 02 AMC' -> next occurrence. A date already past is the last report -> None."""
+    m = re.match(r"([A-Z][a-z]{2}) (\d{1,2})", (value or "").strip())
+    if not m:
+        return None
+    d = datetime.strptime(f"{m.group(1)} {m.group(2)} {today.year}", "%b %d %Y").date()
+    if (today - d).days > 180:  # e.g. "Jan 25" seen in December
+        d = d.replace(year=today.year + 1)
+    return d if d >= today else None
+
+
+def parse_snapshot(data: dict, today: date) -> dict:
+    """get_stock() dict -> Fundamentals field values (None when missing)."""
+    values = {field: _pct(data.get(key)) for field, key in KEYS.items()}
+    values["market_cap"] = _money(data.get(MARKET_CAP))
+    values["dividend_yield_pct"] = _dividend_yield(data.get(DIVIDEND))
+    values["next_earnings"] = _earnings_date(data.get(EARNINGS), today)
+    return values
+
+
+class FinvizProvider:
+    """Fundamentals from Finviz, per-field fallback to `fallback`; prices from `fallback`."""
+
+    def __init__(self, fallback: MarketDataProvider, today: date | None = None):
+        self.fallback = fallback
+        self.today = today or date.today()
+
+    def history(self, ticker: str) -> pd.DataFrame:
+        return self.fallback.history(ticker)
+
+    def fundamentals(self, ticker: str) -> Fundamentals:
+        try:
+            base = self.fallback.fundamentals(ticker)
+        except Exception:
+            base = Fundamentals(sales=[], eps=[], roe_pct=None, market_cap=None, next_earnings=None)
+        sources = {
+            k: "Yahoo"
+            for k in ("roe_pct", "market_cap", "next_earnings", "inst_own_pct")
+            if getattr(base, k) is not None
+        }
+        try:
+            fv = parse_snapshot(finviz.get_stock(ticker), self.today)
+            note = ""
+        except Exception as e:  # scraping: any site change surfaces here
+            fv, note = {}, f"Finviz error: {e}"
+        found = {k: v for k, v in fv.items() if v is not None}
+        sources.update(dict.fromkeys(found, "Finviz"))
+        return dataclasses.replace(base, **found, sources=sources, note=note)
 
 
 def parse_screener_page(html: str) -> tuple[list[str], int]:
@@ -58,10 +124,10 @@ def screener_tickers(url: str) -> list[str]:
     """All tickers from a Finviz screener URL copied from the site.
 
     The `finviz` lib 2.0.0 Screener no longer parses the current site (row count markup
-    changed), so we read the ticker links directly. Contract test: tests/test_finviz.py (slow).
+    changed), so we read the ticker links directly. Contract test: tests/test_providers.py (slow).
     """
     if not url.startswith("https://finviz.com/screener"):
-        raise FinvizError("URL non valido: deve iniziare con https://finviz.com/screener")
+        raise FinvizError("invalid URL: must start with https://finviz.com/screener")
     tickers: list[str] = []
     total, row = None, 1
     while total is None or row <= total:
@@ -73,5 +139,5 @@ def screener_tickers(url: str) -> list[str]:
         tickers += page
         row += PAGE_SIZE
     if not tickers:
-        raise FinvizError("nessun ticker trovato: filtri senza risultati o pagina cambiata")
+        raise FinvizError("no tickers found: filters with no results or page changed")
     return list(dict.fromkeys(tickers))

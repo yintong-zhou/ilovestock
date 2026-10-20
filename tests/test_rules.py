@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -65,14 +66,15 @@ def test_all_fundamentals_pass():
 @pytest.mark.parametrize(
     "field,value,prefix,status",
     [
-        ("sales", [110.0, 100.0], "Crescita vendite", Status.FAIL),
-        ("eps", [1.1, 1.0], "Crescita EPS", Status.FAIL),
+        ("sales_growth_yoy_pct", 20.0, "Sales growth", Status.FAIL),
+        ("eps_growth_yoy_pct", 15.0, "EPS growth", Status.FAIL),
+        ("sales", [110.0, 100.0], "Sales growth", Status.ND),  # yoy needs 5 quarters
         ("roe_pct", 15.0, "ROE", Status.FAIL),
         ("roe_pct", None, "ROE", Status.ND),
-        ("inst_own_pct", 80.0, "Istituzionali", Status.FAIL),
-        ("inst_own_pct", None, "Istituzionali", Status.ND),
-        ("inst_trans_pct", 0.0, "Transazioni", Status.FAIL),
-        ("inst_trans_pct", None, "Transazioni", Status.ND),
+        ("inst_own_pct", 80.0, "Institutional own", Status.FAIL),
+        ("inst_own_pct", None, "Institutional own", Status.ND),
+        ("inst_trans_pct", 0.0, "Institutional trans", Status.FAIL),
+        ("inst_trans_pct", None, "Institutional trans", Status.ND),
         ("market_cap", 30e6, "Market cap", Status.FAIL),
         ("market_cap", 50e9, "Market cap", Status.FAIL),
         ("market_cap", None, "Market cap", Status.ND),
@@ -81,6 +83,30 @@ def test_all_fundamentals_pass():
 def test_fundamental_thresholds(field, value, prefix, status):
     results = fundamental(good_fundamentals(**{field: value}), prices(), CFG)
     assert by_name(results, prefix).status == status
+
+
+def test_qoq_growth_uses_yahoo_quarters_not_finviz():
+    f = good_fundamentals(sales=[110.0, 100.0], sales_growth_yoy_pct=50.0)
+    r = by_name(fundamental(f, prices(), replace(CFG, growth_basis="qoq")), "Sales growth")
+    assert (r.status, r.value, r.note) == (Status.FAIL, 10.0, "source: Yahoo")
+
+
+def test_yoy_growth_prefers_finviz():
+    f = good_fundamentals(sales_growth_yoy_pct=25.0)
+    r = by_name(fundamental(f, prices(), CFG), "Sales growth YOY")
+    assert (r.status, r.value, r.note) == (Status.PASS, 25.0, "source: Finviz")
+
+
+def test_source_and_missing_notes():
+    f = good_fundamentals(roe_pct=None, sources={"market_cap": "Finviz"}, note="Finviz error: x")
+    results = fundamental(f, prices(), CFG)
+    assert by_name(results, "ROE").note == "missing data; Finviz error: x"
+    assert by_name(results, "Market cap").note == "source: Finviz"
+
+
+def test_finviz_dividend_preferred_over_history():
+    results = fundamental(good_fundamentals(dividend_yield_pct=0.31), prices(), CFG)
+    assert by_name(results, "Dividend").status == Status.FAIL
 
 
 def test_dividend_payer_fails():
@@ -117,7 +143,7 @@ def test_earnings(next_date, status):
 def test_technical_on_recorded_data(hzo_daily, bench_close):
     r = {c.name.split()[0]: c.status for c in technical(hzo_daily, bench_close)}
     # values checked against the recorded HZO series (Oct 2026)
-    assert r == {"Forza": Status.PASS, "Donchian": Status.FAIL, "DMI": Status.FAIL,
+    assert r == {"Relative": Status.PASS, "Donchian": Status.FAIL, "DMI": Status.FAIL,
                  "SMA": Status.PASS}  # fmt: skip
 
 
@@ -168,7 +194,7 @@ def test_verdict_earnings_blocks(status):
     [
         None,
         TradePlan(entry=10, stop=9, discarded="R:R 1.5 < 2"),
-        TradePlan(entry=10, stop=9, target=13, shares=0, discarded="0 azioni"),
+        TradePlan(entry=10, stop=9, target=13, shares=0, discarded="0 shares"),
     ],
 )
 def test_verdict_invalid_plan_blocks(plan):

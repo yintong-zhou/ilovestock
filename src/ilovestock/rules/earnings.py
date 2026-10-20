@@ -7,12 +7,11 @@ from ilovestock.models import CriterionResult, Status
 MIN_DAYS_TO_EARNINGS = 10
 
 
-def earnings(next_earnings: date | None, today: date) -> CriterionResult:
-    threshold = f"> {MIN_DAYS_TO_EARNINGS} giorni"
+def earnings(next_earnings: date | None, today: date, source: str = "") -> CriterionResult:
+    threshold = f"> {MIN_DAYS_TO_EARNINGS} days"
     if next_earnings is None or next_earnings < today:
-        return CriterionResult(
-            "Prossimi earnings", Status.ND, None, threshold, "data non disponibile"
-        )
+        return CriterionResult("Next earnings", Status.ND, None, threshold, "date not available")
     days = (next_earnings - today).days
     status = Status.PASS if days > MIN_DAYS_TO_EARNINGS else Status.FAIL
-    return CriterionResult("Prossimi earnings", status, f"{next_earnings} ({days} gg)", threshold)
+    note = f"source: {source}" if source else ""
+    return CriterionResult("Next earnings", status, f"{next_earnings} ({days} d)", threshold, note)

@@ -58,3 +58,15 @@ def bench_close(fake_yf):
     from ilovestock.providers.yahoo import YahooProvider
 
     return YahooProvider().history("^GSPC")["Close"]
+
+
+def fake_get_stock(ticker: str) -> dict:
+    path = FIX / f"{ticker}_finviz.json"
+    if not path.exists():
+        raise RuntimeError(f"no Finviz page for {ticker}")
+    return json.loads(path.read_text())
+
+
+@pytest.fixture
+def fake_finviz(monkeypatch):
+    monkeypatch.setattr("ilovestock.providers.finviz.finviz.get_stock", fake_get_stock)

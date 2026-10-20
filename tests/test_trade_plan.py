@@ -11,17 +11,17 @@ CFG = load(Path("does-not-exist.toml"))
 
 # Course examples. max_loss 100 = capital 10,000 x 1%; cap 100% so it never binds.
 def test_sizing_course_example_20_shares():
-    assert size_position(10_000, 1, 100, entry=50, stop=45) == (20, "rischio")
+    assert size_position(10_000, 1, 100, entry=50, stop=45) == (20, "risk")
 
 
 def test_sizing_course_example_100_shares():
-    assert size_position(10_000, 1, 100, entry=50, stop=49) == (100, "rischio")
+    assert size_position(10_000, 1, 100, entry=50, stop=49) == (100, "risk")
 
 
 def test_sizing_course_example_exposure_cap_40_shares():
     # capital 20,000, risk 0.5% -> max_loss 100; cap 10% -> 2,000 -> 40 shares at 50
     shares, binding = size_position(20_000, 0.5, 10, entry=50, stop=49)
-    assert (shares, binding) == (40, "esposizione")
+    assert (shares, binding) == (40, "exposure")
     assert shares * (50 - 49) == 40  # effective risk 40 instead of 100
 
 
@@ -37,7 +37,7 @@ def test_risk_pct_out_of_range_rejected(risk_pct):
 
 def test_risk_bands():
     assert [risk_band(x) for x in (0.3, 0.5, 1, 1.5, 2)] == [
-        "molto conservativo", "moderato", "moderato", "aggressivo", "aggressivo"
+        "very conservative", "moderate", "moderate", "aggressive", "aggressive"
     ]  # fmt: skip
 
 

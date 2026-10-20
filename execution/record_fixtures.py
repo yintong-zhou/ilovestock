@@ -22,7 +22,7 @@ def record_yahoo(ticker: str) -> None:
     if ticker.startswith("^"):
         return
     t.quarterly_income_stmt.to_csv(OUT / f"{ticker}_income.csv")
-    info = {k: t.info.get(k) for k in ("returnOnEquity", "marketCap")}
+    info = {k: t.info.get(k) for k in ("returnOnEquity", "marketCap", "heldPercentInstitutions")}
     (OUT / f"{ticker}_info.json").write_text(json.dumps(info, indent=2))
     cal = {k: [str(d) for d in v] for k, v in t.calendar.items() if k == "Earnings Date"}
     (OUT / f"{ticker}_calendar.json").write_text(json.dumps(cal, indent=2))

@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 import pandas as pd
@@ -5,7 +6,7 @@ import pytest
 
 from ilovestock.providers import finviz
 from ilovestock.providers.cache import CachedProvider
-from ilovestock.providers.yahoo import YahooProvider
+from ilovestock.providers.yahoo import YahooProvider, drop_partial_bar
 from tests.conftest import FIX
 
 
@@ -14,6 +15,20 @@ def test_yahoo_history_shape(fake_yf):
     assert list(df.columns) == ["Open", "High", "Low", "Close", "Volume", "Dividends"]
     assert df.index.tz is None and df.index.is_monotonic_increasing
     assert len(df) > 400
+
+
+@pytest.mark.parametrize(
+    "now,kept",
+    [
+        ("2026-10-19 10:00", False),  # session open: last bar is partial
+        ("2026-10-19 16:30", True),  # after the close
+        ("2026-10-20 10:00", True),  # last bar is from a previous day
+    ],
+)
+def test_drop_partial_bar(fake_yf, now, kept):
+    df = YahooProvider().history("HZO")
+    out = drop_partial_bar(df, pd.Timestamp(now, tz="America/New_York"))
+    assert (out.index[-1] == df.index[-1]) == kept and len(out) == len(df) - (not kept)
 
 
 def test_yahoo_fundamentals(fake_yf):
@@ -40,7 +55,7 @@ def test_yahoo_missing_data(monkeypatch):
     f = YahooProvider().fundamentals("XXX")
     assert f.sales == [] and f.roe_pct is None and f.market_cap is None
     assert f.next_earnings is None
-    with pytest.raises(Exception, match="nessun prezzo"):
+    with pytest.raises(Exception, match="no prices"):
         YahooProvider().history("XXX")
 
 
@@ -70,25 +85,70 @@ def test_finviz_pct():
     assert finviz._pct("-") is None and finviz._pct(None) is None
 
 
-def test_finviz_institutional_keys_on_recorded_response(monkeypatch):
-    import json
-
-    import finviz as lib
-
-    data = json.loads((FIX / "HZO_finviz.json").read_text())
-    monkeypatch.setattr(lib, "get_stock", lambda t: data)
-    assert finviz.institutional("HZO") == (82.64, -1.02, "")
+TODAY = date(2026, 10, 20)  # day the fixtures were recorded
 
 
-def test_finviz_failure_is_missing_not_guess(monkeypatch):
-    import finviz as lib
+def test_finviz_value_parsers():
+    assert finviz._money("1.15B") == pytest.approx(1.15e9)
+    assert finviz._money("4982.82B") == pytest.approx(4.98282e12)
+    assert finviz._money("-") is None
+    assert finviz._dividend_yield("1.06 (0.31%)") == 0.31
+    assert finviz._dividend_yield("-") is None
 
+
+@pytest.mark.parametrize(
+    "raw,today,expected",
+    [
+        ("Nov 02 AMC", date(2026, 10, 20), date(2026, 11, 2)),
+        ("Jul 23 BMO", date(2026, 10, 20), None),  # already reported: not the next one
+        ("Jan 25 AMC", date(2026, 12, 20), date(2027, 1, 25)),  # year rollover
+        ("-", date(2026, 10, 20), None),
+    ],
+)
+def test_finviz_earnings_date(raw, today, expected):
+    assert finviz._earnings_date(raw, today) == expected
+
+
+def test_finviz_snapshot_on_recorded_responses():
+    hzo = finviz.parse_snapshot(json.loads((FIX / "HZO_finviz.json").read_text()), TODAY)
+    assert hzo == {
+        "sales_growth_yoy_pct": -6.98,
+        "eps_growth_yoy_pct": 127.37,
+        "roe_pct": 0.42,
+        "inst_own_pct": 82.64,
+        "inst_trans_pct": -1.02,
+        "market_cap": pytest.approx(1.15e9),
+        "dividend_yield_pct": None,  # "-": no dividend or missing -> fallback
+        "next_earnings": None,  # "Jul 23": last report
+    }
+    aapl = finviz.parse_snapshot(json.loads((FIX / "AAPL_finviz.json").read_text()), TODAY)
+    assert aapl["dividend_yield_pct"] == 0.31 and aapl["next_earnings"] == date(2026, 11, 2)
+
+
+def test_finviz_provider_merges_with_yahoo_fallback(fake_yf, fake_finviz):
+    f = finviz.FinvizProvider(YahooProvider(), TODAY).fundamentals("HZO")
+    assert f.roe_pct == 0.42 and f.sources["roe_pct"] == "Finviz"
+    assert f.inst_own_pct == 82.64 and f.sources["inst_own_pct"] == "Finviz"
+    assert f.next_earnings == date(2026, 11, 12) and f.sources["next_earnings"] == "Yahoo"
+    assert f.sales[0] == 611258000.0  # Yahoo quarters kept for qoq
+    assert f.note == ""
+
+
+def test_finviz_failure_falls_back_never_guesses(fake_yf, monkeypatch):
     def boom(_):
         raise RuntimeError("page changed")
 
-    monkeypatch.setattr(lib, "get_stock", boom)
-    own, trans, note = finviz.institutional("HZO")
-    assert own is None and trans is None and "page changed" in note
+    monkeypatch.setattr(finviz.finviz, "get_stock", boom)
+    f = finviz.FinvizProvider(YahooProvider(), TODAY).fundamentals("HZO")
+    assert f.roe_pct == pytest.approx(0.497) and f.sources["roe_pct"] == "Yahoo"
+    assert f.inst_own_pct == pytest.approx(84.632003) and f.sources["inst_own_pct"] == "Yahoo"
+    assert f.inst_trans_pct is None and f.sales_growth_yoy_pct is None
+    assert "page changed" in f.note
+
+
+def test_cache_keeps_finviz_fields(fake_yf, fake_finviz, tmp_path):
+    p = CachedProvider(finviz.FinvizProvider(YahooProvider(), TODAY), tmp_path)
+    assert p.fundamentals("HZO") == p.fundamentals("HZO")
 
 
 def test_parse_screener_page():
@@ -127,5 +187,5 @@ def test_screener_rejects_other_hosts():
 @pytest.mark.slow
 def test_finviz_live_contract():
     """Detects Finviz page-structure changes. Hits the live site: run only on request."""
-    assert finviz.institutional("AAPL")[0] is not None
+    assert finviz.parse_snapshot(finviz.finviz.get_stock("AAPL"), date.today())["inst_own_pct"]
     assert len(finviz.screener_tickers("https://finviz.com/screener.ashx?v=111&f=idx_dji")) == 30

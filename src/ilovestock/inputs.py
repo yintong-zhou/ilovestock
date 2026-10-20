@@ -10,7 +10,7 @@ HEADERS = {"TICKER", "SYMBOL"}
 def normalize(ticker: str) -> str:
     t = ticker.strip().upper()
     if not TICKER_RE.match(t):
-        raise ValueError(f"ticker non valido: {ticker!r}")
+        raise ValueError(f"invalid ticker: {ticker!r}")
     return t
 
 

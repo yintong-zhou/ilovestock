@@ -19,10 +19,10 @@ MIN_R_MULTIPLE = 2.0
 
 def risk_band(risk_pct: float) -> str:
     if risk_pct < 0.5:
-        return "molto conservativo"
+        return "very conservative"
     if risk_pct <= 1:
-        return "moderato"
-    return "aggressivo"
+        return "moderate"
+    return "aggressive"
 
 
 def size_position(
@@ -33,7 +33,7 @@ def size_position(
     # round() absorbs float noise like 100 / (50.2 - 50.1) = 999.99999
     by_risk = math.floor(round(max_loss / (entry - stop), 6))
     by_cap = math.floor(round(capital * max_position_pct / 100 / entry, 6))
-    return (by_cap, "esposizione") if by_cap < by_risk else (by_risk, "rischio")
+    return (by_cap, "exposure") if by_cap < by_risk else (by_risk, "risk")
 
 
 def entry_level(daily: pd.DataFrame, weekly: pd.DataFrame, upper: pd.Series, mode: str) -> float:
@@ -49,11 +49,11 @@ def consolidation_info(w: pd.DataFrame) -> list[str]:
     base = w.iloc[-ind.DONCHIAN_WEEKS - 1 : -1]
     hi, lo = base["High"].max(), base["Low"].min()
     depth = (hi - lo) / hi * 100
-    label = "< 38%" if depth < 38 else "< 50%" if depth < 50 else ">= 50% (troppo profonda)"
+    label = "< 38%" if depth < 38 else "< 50%" if depth < 50 else ">= 50% (too deep)"
     vol_ratio = w["Volume"].iloc[-1] / base["Volume"].mean()
     return [
-        f"Correzione nel consolidamento {ind.DONCHIAN_WEEKS}w: {depth:.1f}% ({label})",
-        f"Volume settimana corrente / media {ind.DONCHIAN_WEEKS}w: {vol_ratio:.2f}x",
+        f"Consolidation correction {ind.DONCHIAN_WEEKS}w: {depth:.1f}% ({label})",
+        f"Current week volume / {ind.DONCHIAN_WEEKS}w average: {vol_ratio:.2f}x",
     ]
 
 
@@ -85,9 +85,11 @@ def trade_plan(daily: pd.DataFrame, cfg: Config) -> TradePlan | None:
     )
     plan.effective_risk = round(plan.shares * risk, 2)
     plan.position_value = round(plan.shares * entry, 2)
-    plan.info.append(f"Scale-out: ½ a {entry + risk:.2f} (1R), ½ sopra {entry + 3 * risk:.2f} (3R)")
+    plan.info.append(
+        f"Scale-out: ½ at {entry + risk:.2f} (1R), ½ above {entry + 3 * risk:.2f} (3R)"
+    )
     if cfg.r_multiple < MIN_R_MULTIPLE:
         plan.discarded = f"R:R {cfg.r_multiple:g} < {MIN_R_MULTIPLE:g}"
     elif plan.shares < 1:
-        plan.discarded = "0 azioni: capitale o rischio troppo bassi per questo stop"
+        plan.discarded = "0 shares: capital or risk too low for this stop"
     return plan

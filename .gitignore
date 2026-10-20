@@ -4,6 +4,10 @@
 # Intermediates (rigenerabili)
 .tmp/
 
+# Generated reports (folder kept)
+reports/*
+!reports/.gitkeep
+
 # Python
 __pycache__/
 *.pyc

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
 
-DISCLAIMER = "Strumento educativo di screening, non è consulenza finanziaria."
+DISCLAIMER = "Educational screening tool, not financial advice."
 
 
 class Status(StrEnum):
@@ -31,14 +31,18 @@ class CriterionResult:
 class Fundamentals:
     """Raw fundamental inputs. None = missing data (-> N/D, never PASS)."""
 
-    sales: list[float | None]  # quarterly, most recent first
-    eps: list[float | None]  # quarterly diluted EPS, most recent first
+    sales: list[float | None]  # quarterly, most recent first (Yahoo)
+    eps: list[float | None]  # quarterly diluted EPS, most recent first (Yahoo)
     roe_pct: float | None
     market_cap: float | None
     next_earnings: date | None
     inst_own_pct: float | None = None
     inst_trans_pct: float | None = None
-    inst_note: str = ""  # why institutional data is missing
+    sales_growth_yoy_pct: float | None = None  # Finviz "Sales Q/Q" (actually YoY)
+    eps_growth_yoy_pct: float | None = None  # Finviz "EPS Q/Q" (actually YoY)
+    dividend_yield_pct: float | None = None  # None -> computed from the dividend history
+    sources: dict[str, str] = field(default_factory=dict)  # field name -> "Finviz" | "Yahoo"
+    note: str = ""  # why Finviz data is missing
 
 
 @dataclass
@@ -50,7 +54,7 @@ class TradePlan:
     max_loss: float = 0.0
     effective_risk: float = 0.0
     position_value: float = 0.0
-    binding: str = ""  # "rischio" or "esposizione": which constraint set the shares
+    binding: str = ""  # "risk" or "exposure": which constraint set the shares
     risk_band: str = ""
     trailing_stop_10w: float | None = None
     trailing_stop_8w: float | None = None

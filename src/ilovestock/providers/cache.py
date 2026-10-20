@@ -38,10 +38,13 @@ class CachedProvider:
     def fundamentals(self, ticker: str) -> Fundamentals:
         path = self._path(ticker, "fundamentals", "json")
         if path.exists():
-            raw = json.loads(path.read_text())
-            if raw["next_earnings"]:
-                raw["next_earnings"] = date.fromisoformat(raw["next_earnings"])
-            return Fundamentals(**raw)
+            try:
+                raw = json.loads(path.read_text())
+                if raw["next_earnings"]:
+                    raw["next_earnings"] = date.fromisoformat(raw["next_earnings"])
+                return Fundamentals(**raw)
+            except (ValueError, KeyError, TypeError):  # corrupt or older format: refetch
+                pass
         f = self.inner.fundamentals(ticker)
         path.write_text(json.dumps(dataclasses.asdict(f), default=str))
         return f

@@ -212,7 +212,7 @@ No deadlines (spare-time development). Ordered by dependency.
 ## Open decisions
 **Before M3-M4:**
 - D1 ROE: the course text says "ROE > 15% Q/Q" but the screener table says "ROE > 15%". Level or change? No Proposal: ask.
-- D2 Q/Q definition: course = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. Proposal: default `qoq`, option `yoy`.
+- D2 Q/Q definition: course = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. **Decided (2026-10-20): default `yoy` from Finviz, option `qoq` from yfinance.**
 - D3 Missing institutional data (ticker lacks it or the library fails). Proposal: criterion `N/D`, verdict NO-BUY reason "missing data", option `--allow-missing` to skip knowingly.
 - D4 Market cap thresholds: course names the bands (nano, micro, small, mid, large, giant) without numbers in the course material read. Proposal: start from Finviz bands, make them configurable.
 - D5 Stop algorithm for "most important previous low". Proposal: low of the consolidation or last pivot low over N weeks.
@@ -221,8 +221,8 @@ No deadlines (spare-time development). Ordered by dependency.
 - D8 Intermediate "watchlist" state (fundamentals pass, technicals not yet). v1 keeps two states (BUY / NO-BUY) until decided.
 
 **Before publishing:**
-- D9 License (e.g. MIT or Apache-2.0). Project name is decided: `ilovestock`. `finviz` is MIT, no constraint.
-- D10 Finviz ToS: library authors warn use may violate them. Proposal: Finviz as optional dependency (`pip install ilovestock[finviz]`), warning in README and CLI output; tickers and watchlist always work without it.
+- D9 License. **Decided: GPL-3.0.** Project name is decided: `ilovestock`. `finviz` is MIT, no constraint.
+- D10 Finviz ToS: library authors warn use may violate them. **Decided (2026-10-20): Finviz is the main source for fundamentals and a required dependency; yfinance is the per-field fallback and the price source. Warning in README and CLI output.**
 - D11 Web/graphical UI: not excluded, but chosen output is terminal + reports. Default: no GUI in v1. To confirm.
 
 ## Risks

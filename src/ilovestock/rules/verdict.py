@@ -18,7 +18,7 @@ def verdict(
     ]
     reasons += [f"{c.name}: {c.status}" for c in [earnings, *technical] if c.status != Status.PASS]
     if plan is None:
-        reasons.append("Piano di trade: storico insufficiente")
+        reasons.append("Trade plan: not enough history")
     elif plan.discarded:
-        reasons.append(f"Piano di trade scartato: {plan.discarded}")
+        reasons.append(f"Trade plan discarded: {plan.discarded}")
     return (Verdict.NO_BUY if reasons else Verdict.BUY), reasons

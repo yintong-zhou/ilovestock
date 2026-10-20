@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,8 @@ name = "ilovestock"
 version = "0.1.0"
 description = "Educational buy/no-buy screening + trade plan for US stocks. Not financial advice."
 readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "typer>=0.12",
@@ -14,10 +16,10 @@ dependencies = [
     "pandas>=2.2",
     "numpy>=1.26",
     "yfinance==1.7.0",
+    "finviz==2.0.0",
 ]
 
 [project.optional-dependencies]
-finviz = ["finviz==2.0.0"]
 dev = ["pytest>=8", "ruff>=0.6", "ta-lib>=0.6"]
 
 [project.scripts]

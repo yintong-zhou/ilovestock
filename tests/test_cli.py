@@ -66,10 +66,9 @@ def test_merge_dedupes_in_order():
 
 # --- CLI ---
 @pytest.fixture
-def offline(monkeypatch, fake_yf, tmp_path):
+def offline(monkeypatch, fake_yf, fake_finviz, tmp_path):
     monkeypatch.setattr(cli, "CachedProvider", lambda p: p)
     monkeypatch.setattr(cli, "console", Console(width=200))
-    monkeypatch.setattr(cli.finviz, "institutional", lambda t: (50.0, 1.0, ""))
     monkeypatch.setattr(cli.finviz, "screener_tickers", lambda url: ["SCRN", "HZO"])
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
     return tmp_path
@@ -90,14 +89,14 @@ def test_analyze_combines_three_inputs(offline):
     assert result.exit_code == 0, result.output
     rows = [line.split("│")[1].strip() for line in result.output.splitlines() if "NO-BUY" in line]
     assert rows == ["HZO", "WLST", "SCRN"]  # union, deduplicated, input order
-    assert "Errore dati" in result.output  # WLST/SCRN have no recorded data: reported, not crashed
+    assert "Data error" in result.output  # WLST/SCRN have no recorded data: reported, not crashed
     assert DISCLAIMER in result.output.replace("\n", " ")
 
 
 def test_analyze_detail_shows_criteria(offline):
     result = runner.invoke(cli.app, ["analyze", "HZO", "--detail"])
     assert result.exit_code == 0, result.output
-    for text in ("Crescita vendite QOQ", "DMI 18d", "Piano di trade", "Prossimi earnings"):
+    for text in ("Sales growth YOY", "source: Finviz", "DMI 18d", "Trade plan", "Next earnings"):
         assert text in result.output
 
 
@@ -117,3 +116,23 @@ def test_config_init_show_path(offline):
     assert show.exit_code == 0 and "capital = 20000" in show.output
     path = runner.invoke(cli.app, ["config", "path"])
     assert "config.toml" in path.output
+
+
+def test_analyze_exports_three_files(offline):
+    out = offline / "reports"
+    result = runner.invoke(
+        cli.app, ["analyze", "HZO", "WLST", "--export", "md,csv,json", "--out-dir", str(out)]
+    )
+    assert result.exit_code == 0, result.output
+    files = sorted(p.name for p in out.glob("*/*"))
+    assert files == ["report.md", "results.csv", "results.json"]
+    for path in out.glob("*/*"):
+        text = path.read_text(encoding="utf-8")
+        assert DISCLAIMER in text
+        assert "2026-10-19" in text  # data date of the recorded HZO prices
+        assert "Finviz" in text and "Yahoo" in text  # sources
+
+
+def test_analyze_rejects_unknown_export_format(offline):
+    result = runner.invoke(cli.app, ["analyze", "HZO", "--export", "pdf"])
+    assert result.exit_code == 1 and "export format" in result.output
