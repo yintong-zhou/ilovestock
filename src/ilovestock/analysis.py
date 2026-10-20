@@ -1,12 +1,13 @@
 """One ticker end to end: data -> criteria -> trade plan -> verdict. Shared by CLI and API."""
 
+from collections.abc import Callable
 from datetime import date
 
 import pandas as pd
 
 from ilovestock.config import Config
 from ilovestock.models import TickerAnalysis, Verdict
-from ilovestock.providers.base import MarketDataProvider
+from ilovestock.providers.base import BENCHMARK, MarketDataProvider
 from ilovestock.rules.earnings import earnings
 from ilovestock.rules.fundamental import fundamental
 from ilovestock.rules.technical import technical
@@ -43,3 +44,21 @@ def analyze(
         plan=plan,
         data_date=daily.index[-1].date(),
     )
+
+
+def analyze_many(
+    tickers: list[str],
+    provider: MarketDataProvider,
+    cfg: Config,
+    today: date,
+    allow_missing: bool = False,
+    progress: Callable[[str], None] | None = None,
+) -> list[TickerAnalysis]:
+    """Fetch the benchmark once, then analyze each ticker. Benchmark failure raises."""
+    bench = provider.history(BENCHMARK)["Close"]
+    results = []
+    for t in tickers:
+        if progress:
+            progress(t)
+        results.append(analyze(t, provider, bench, cfg, today, allow_missing))
+    return results

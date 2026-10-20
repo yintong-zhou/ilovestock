@@ -26,6 +26,11 @@ class CriterionResult:
     threshold: str
     note: str = ""
 
+    def __post_init__(self):
+        # numpy scalars (from pandas) -> plain float, so JSON/API serialization stays clean
+        if self.value is not None and not isinstance(self.value, str):
+            self.value = float(self.value)
+
 
 @dataclass
 class Fundamentals:

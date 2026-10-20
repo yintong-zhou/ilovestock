@@ -1,0 +1,41 @@
+import type { AnalyzeOut, AppConfig, PinStatus } from './types'
+
+export class ApiError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let message = res.statusText
+    try {
+      const { detail } = await res.json()
+      message = typeof detail === 'string' ? detail : JSON.stringify(detail)
+    } catch {
+      // non-JSON error body: keep the status text
+    }
+    throw new ApiError(res.status, message)
+  }
+  return (res.status === 204 ? undefined : await res.json()) as T
+}
+
+export const api = {
+  pinStatus: () => request<PinStatus>('GET', '/api/pin/status'),
+  setupPin: (pin: string) => request<void>('POST', '/api/pin/setup', { pin }),
+  unlock: (pin: string) => request<void>('POST', '/api/pin/unlock', { pin }),
+  lock: () => request<void>('POST', '/api/pin/lock'),
+  changePin: (current_pin: string, new_pin: string) =>
+    request<void>('POST', '/api/pin/change', { current_pin, new_pin }),
+  getConfig: () => request<AppConfig>('GET', '/api/config'),
+  putConfig: (cfg: AppConfig) => request<AppConfig>('PUT', '/api/config', cfg),
+  analyze: (tickers: string[], finviz_url: string | null, allow_missing: boolean) =>
+    request<AnalyzeOut>('POST', '/api/analyze', { tickers, finviz_url, allow_missing }),
+}

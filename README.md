@@ -170,6 +170,21 @@ large_max = 200000
 > [!IMPORTANT]
 > Technical indicator parameters are fixed constants on purpose: they are not in the config and have no options. The method treats tuning them case by case as a mistake.
 
+## Web app
+
+A local web app on the same core, for this computer only.
+
+```bash
+cd web && npm install && npm run build && cd ..   # once, and after frontend changes
+ilovestock serve                                   # http://127.0.0.1:8000
+```
+
+- **PIN.** On the first visit the app asks you to set a PIN (4 to 8 digits). It is stored hashed in `~/.config/ilovestock/web_pin.json`, never in clear. After 5 wrong attempts, the next ones wait 30 seconds. Forgot it? Run `ilovestock pin reset`.
+- **Pages.** Dashboard (statistics of the latest analysis in this session), Portfolio (planned for phase 2), Analysis (same rules and trade plan as the CLI), Settings (PIN and the same config file as the CLI).
+
+> [!IMPORTANT]
+> The server listens on `127.0.0.1` only. The PIN is a lock for this computer, not real authentication: do not expose the app on a network.
+
 ## How the verdict works
 
 **BUY** requires all of the following. Anything else is **NO-BUY**, with the reasons listed.
@@ -233,6 +248,15 @@ ruff check .
 ruff format --check .
 ```
 
+Frontend (React + Vite + Tailwind, in `web/`):
+
+```bash
+ilovestock serve          # API on :8000
+cd web && npm run dev     # http://localhost:5173, /api proxied to :8000
+npm run lint
+npm run build
+```
+
 - Default tests never touch the network. They run on real responses recorded in `tests/fixtures/`.
 - Tests marked `slow` hit live Finviz to detect page changes. Run them on purpose with `pytest -m slow`.
 - Indicators are checked against TA-Lib, which is a dev dependency.
@@ -250,11 +274,12 @@ src/ilovestock/
   providers/      yfinance, Finviz adapter, disk cache
   report.py       Rich terminal output
   export.py       Markdown, CSV and JSON report files
+  api/            FastAPI app and PIN gate for the web app
 tests/            offline tests and recorded fixtures
+web/              React frontend
 ```
 
 ### Roadmap
 
 - First public release on PyPI
-- A local web interface on the same core
 - Phase 2: managing open positions (hold/sell, trailing stop, sector cap)

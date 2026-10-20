@@ -10,7 +10,7 @@ from rich.console import Console
 
 from ilovestock import config as cfgmod
 from ilovestock import export, inputs
-from ilovestock.analysis import analyze as analyze_ticker
+from ilovestock.analysis import analyze_many
 from ilovestock.models import DISCLAIMER
 from ilovestock.providers import finviz
 from ilovestock.providers.base import BENCHMARK
@@ -21,6 +21,8 @@ from ilovestock.report import print_report
 app = typer.Typer(help=f"BUY / NO-BUY verdict + trade plan for US stocks. {DISCLAIMER}")
 config_app = typer.Typer(help="Manage the config file.")
 app.add_typer(config_app, name="config")
+pin_app = typer.Typer(help="Web app PIN.")
+app.add_typer(pin_app, name="pin")
 console = Console()
 
 
@@ -93,17 +95,19 @@ def analyze(
         _fail("no tickers: pass TICKER, --watchlist or --finviz-url")
 
     provider = CachedProvider(finviz.FinvizProvider(YahooProvider()))
-    try:
-        bench = provider.history(BENCHMARK)["Close"]
-    except Exception as e:
-        _fail(f"benchmark {BENCHMARK} not available: {e}")
-
     console.print(f"[dim]{finviz.WARNING}[/]")
-    results = []
     with console.status("Analyzing...") as status:
-        for t in all_tickers:
-            status.update(f"Analyzing {t}...")
-            results.append(analyze_ticker(t, provider, bench, cfg, date.today(), allow_missing))
+        try:
+            results = analyze_many(
+                all_tickers,
+                provider,
+                cfg,
+                date.today(),
+                allow_missing,
+                lambda t: status.update(f"Analyzing {t}..."),
+            )
+        except Exception as e:
+            _fail(f"benchmark {BENCHMARK} not available: {e}")
     print_report(results, detail, console)
     if formats:
         for path in export.write_reports(results, formats, out_dir, cfg, datetime.now()):
@@ -136,3 +140,32 @@ def config_show() -> None:
 def config_path() -> None:
     """Config file path."""
     console.print(str(cfgmod.CONFIG_PATH))
+
+
+@app.command()
+def serve(port: Annotated[int, typer.Option(help="Local port")] = 8000) -> None:
+    """Start the local web app on http://127.0.0.1:PORT (this computer only)."""
+    import uvicorn
+
+    from ilovestock.api.app import create_app
+
+    # 127.0.0.1 only: the app has a PIN, not real authentication.
+    console.print(f"ilovestock web app: http://127.0.0.1:{port}  (Ctrl+C to stop)")
+    uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")
+
+
+@pin_app.command("reset")
+def pin_reset(
+    yes: Annotated[bool, typer.Option("--yes", help="Skip the confirmation")] = False,
+) -> None:
+    """Delete the web PIN: the next visit asks to set a new one."""
+    from ilovestock.api.pin import PinStore
+
+    store = PinStore()
+    if not store.configured():
+        console.print("No PIN set.")
+        return
+    if not yes and not typer.confirm("Delete the web app PIN?"):
+        raise typer.Exit(1)
+    store.reset()
+    console.print("PIN deleted. Restart `ilovestock serve` to close open sessions.")

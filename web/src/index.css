@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/* Brand palette (brand-guidelines.md) set on a dark desk. Derived tints keep text contrast
+   >= 4.5:1 on the dark panels: brand accent/secondary are used as fills, tints as text. */
+@theme {
+  --color-canvas: #16232e; /* brand dark neutral */
+  --color-panel: #1b2a36;
+  --color-well: #121d26; /* inputs, insets */
+  --color-line: #2a3b48;
+  --color-navy: #0b3d62; /* brand primary */
+  --color-teal: #1f6f8b; /* brand secondary */
+  --color-teal-tint: #7cc1d9;
+  --color-green: #2e9e5b; /* brand accent */
+  --color-pass: #52bf7f;
+  --color-fail: #e2786c;
+  --color-nd: #d9b04f;
+  --color-text: #eef3f6; /* brand light neutral */
+  --color-muted: #9aabb8;
+
+  --font-heading: "Merriweather", Georgia, serif;
+  --font-sans: "Source Sans 3", system-ui, sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-base leading-normal text-text antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-teal-tint);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
