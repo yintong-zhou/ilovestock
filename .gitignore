@@ -23,3 +23,6 @@ src/ilovestock/static/
 # Python build output
 build/
 dist/
+
+# Brainstorming mockups
+.superpowers/

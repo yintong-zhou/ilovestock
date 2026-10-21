@@ -121,6 +121,12 @@ A watchlist is a text or CSV file with one ticker per line. Lines starting with 
 
 Every file states the data date, the data sources and the disclaimer.
 
+### History
+
+Every analysis, from the terminal or the web app, adds one row per ticker to `~/.config/ilovestock/history.csv`: date, data date, verdict, price, entry, stop, target, shares, reasons, and every criterion with its status and value (as JSON, since criterion names can change). Tickers with a data error are not saved. The file opens in Excel.
+
+In the web app, the **History** page lists the analyzed tickers and, for each one, every analysis with what changed from the previous one (verdict, criteria, price). There you can add a note, edit verdict, price and levels (the analysis is then marked *edited*), and delete one analysis or a ticker's whole history.
+
 ### Configuration
 
 ```bash
@@ -169,7 +175,7 @@ ilovestock serve                                   # http://127.0.0.1:8000
 ```
 
 - **PIN.** The first `ilovestock serve` asks you to set a PIN (4 to 8 digits) in the terminal, never in the browser: no other program on this computer can claim the app first. It is stored hashed in `~/.config/ilovestock/web_pin.json`, never in clear. After 5 wrong attempts, the next ones wait 30 seconds. Forgot it? Run `ilovestock pin reset`, then `ilovestock serve` again.
-- **Pages.** Dashboard (statistics of the latest analysis in this session), Portfolio (planned for phase 2), Analysis (same rules and trade plan as the CLI), Settings (PIN and the same config file as the CLI).
+- **Pages.** Dashboard (statistics of the latest analysis in this session), Portfolio (planned for phase 2), Analysis (same rules and trade plan as the CLI), History (every saved analysis, with notes, edits and deletion: see [History](#history)), Settings (PIN and the same config file as the CLI).
 
 > [!IMPORTANT]
 > The server listens on `127.0.0.1` only. The PIN is a lock for this computer, not real authentication: do not expose the app on a network.

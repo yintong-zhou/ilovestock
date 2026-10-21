@@ -4,23 +4,25 @@ import { api, ApiError } from './api'
 import { Message } from './components'
 import Analysis from './pages/Analysis'
 import Dashboard from './pages/Dashboard'
+import History from './pages/History'
 import Portfolio from './pages/Portfolio'
 import Settings from './pages/Settings'
 import PinScreen from './PinScreen'
 import Sidebar, { type Page } from './Sidebar'
 import type { AnalyzeOut, PinStatus } from './types'
 
-const PAGES: Page[] = ['dashboard', 'portfolio', 'analysis', 'settings']
+const PAGES: Page[] = ['dashboard', 'portfolio', 'analysis', 'history', 'settings']
 
-function pageFromHash(): Page {
-  const p = window.location.hash.slice(1) as Page
-  return PAGES.includes(p) ? p : 'dashboard'
+/** '#history/HZO' -> ['history', 'HZO']: page plus an optional argument. */
+function routeFromHash(): [Page, string] {
+  const [p, arg = ''] = decodeURIComponent(window.location.hash.slice(1)).split('/')
+  return PAGES.includes(p as Page) ? [p as Page, arg] : ['dashboard', '']
 }
 
 export default function App() {
   const [status, setStatus] = useState<PinStatus | null>(null)
   const [error, setError] = useState('')
-  const [page, setPage] = useState<Page>(pageFromHash)
+  const [[page, arg], setRoute] = useState(routeFromHash)
   // Latest analysis of this session, shared by Analysis and Dashboard (not stored on disk).
   const [lastRun, setLastRun] = useState<AnalyzeOut | null>(null)
 
@@ -32,7 +34,7 @@ export default function App() {
 
   useEffect(() => {
     const onHash = () => {
-      setPage(pageFromHash())
+      setRoute(routeFromHash())
       window.scrollTo(0, 0) // each page opens at its top
     }
     window.addEventListener('hashchange', onHash)
@@ -74,6 +76,7 @@ export default function App() {
         {page === 'dashboard' && <Dashboard run={lastRun} />}
         {page === 'portfolio' && <Portfolio />}
         {page === 'analysis' && <Analysis run={lastRun} onRun={setLastRun} onApiError={onApiError} />}
+        {page === 'history' && <History ticker={arg} onApiError={onApiError} />}
         {page === 'settings' && <Settings onApiError={onApiError} />}
         </div>
       </main>

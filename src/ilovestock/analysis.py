@@ -47,6 +47,7 @@ def analyze(
         earnings=earn,
         plan=plan,
         data_date=daily.index[-1].date(),
+        price=round(float(daily["Close"].iloc[-1]), 2),
     )
 
 

@@ -83,3 +83,4 @@ class TickerAnalysis:
     plan: TradePlan | None = None
     data_date: date | None = None
     error: str | None = None
+    price: float | None = None  # last close of the analyzed data

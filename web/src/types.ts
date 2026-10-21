@@ -37,6 +37,7 @@ export interface TickerAnalysis {
   plan: TradePlan | null
   data_date: string | null
   error: string | null
+  price: number | null
 }
 
 export interface AnalyzeOut {
@@ -46,6 +47,26 @@ export interface AnalyzeOut {
   finviz_warning: string
   results: TickerAnalysis[]
 }
+
+/** One saved analysis of one ticker (src/ilovestock/history.py). */
+export interface HistoryRow {
+  id: string
+  analyzed_at: string
+  data_date: string | null
+  ticker: string
+  verdict: Verdict
+  price: number | null
+  entry: number | null
+  stop: number | null
+  target: number | null
+  shares: number | null
+  reasons: string[]
+  criteria: CriterionResult[]
+  note: string
+  edited_at: string | null
+}
+
+export type HistoryEdit = Partial<Pick<HistoryRow, 'verdict' | 'price' | 'entry' | 'stop' | 'target' | 'shares' | 'note'>>
 
 export interface PinStatus {
   configured: boolean

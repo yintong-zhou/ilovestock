@@ -6,7 +6,7 @@ The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 
 import dataclasses
 import threading
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ilovestock import config as cfgmod
-from ilovestock import inputs
+from ilovestock import history, inputs
 from ilovestock.analysis import analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
 from ilovestock.export import SOURCES, data_date
@@ -64,6 +64,7 @@ def create_app(
     config_path: Path | None = None,
     provider: MarketDataProvider | None = None,
     static_dir: Path = WEB_DIST,
+    history_path: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ilovestock", description=DISCLAIMER)
     app.add_middleware(
@@ -168,6 +169,7 @@ def create_app(
             results = analyze_many(tickers, provider, cfg, date.today(), body.allow_missing)
         except Exception as e:
             raise HTTPException(502, f"Benchmark data not available: {e}") from e
+        history.append(results, datetime.now(), history_path)
         return AnalyzeOut(
             disclaimer=DISCLAIMER,
             sources=SOURCES,
@@ -175,6 +177,30 @@ def create_app(
             finviz_warning=finviz.WARNING,
             results=results,
         )
+
+    @app.get("/api/history", dependencies=[Depends(session)])
+    def history_rows() -> list[dict]:
+        return history.read(history_path)
+
+    @app.patch("/api/history/{row_id}", dependencies=[Depends(session)])
+    def history_edit(row_id: str, changes: dict) -> dict:
+        try:
+            return history.update(row_id, changes, history_path)
+        except history.HistoryError as e:
+            raise HTTPException(422, str(e)) from e
+        except KeyError as e:
+            raise HTTPException(404, "Analysis not found in the history") from e
+
+    @app.delete("/api/history/{row_id}", status_code=204, dependencies=[Depends(session)])
+    def history_delete(row_id: str) -> None:
+        try:
+            history.delete(history_path, ids=[row_id])
+        except KeyError as e:
+            raise HTTPException(404, "Analysis not found in the history") from e
+
+    @app.delete("/api/history", status_code=204, dependencies=[Depends(session)])
+    def history_delete_ticker(ticker: str) -> None:
+        history.delete(history_path, ticker=ticker.upper())
 
     if static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")

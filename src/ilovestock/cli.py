@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from ilovestock import config as cfgmod
-from ilovestock import export, inputs
+from ilovestock import export, history, inputs
 from ilovestock.analysis import analyze_many
 from ilovestock.models import DISCLAIMER
 from ilovestock.providers import finviz
@@ -109,6 +109,8 @@ def analyze(
         except Exception as e:
             _fail(f"benchmark {BENCHMARK} not available: {e}")
     print_report(results, detail, console)
+    if saved := history.append(results, datetime.now()):
+        console.print(f"[dim]History: {saved} analyses added to {history.HISTORY_PATH}[/]")
     if formats:
         for path in export.write_reports(results, formats, out_dir, cfg, datetime.now()):
             console.print(f"Report written: {path}")

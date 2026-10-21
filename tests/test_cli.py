@@ -4,7 +4,7 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
-from ilovestock import cli, config, inputs
+from ilovestock import cli, config, history, inputs
 from ilovestock.models import DISCLAIMER
 
 runner = CliRunner()
@@ -74,6 +74,7 @@ def offline(monkeypatch, fake_yf, fake_finviz, tmp_path):
     monkeypatch.setattr(cli, "console", Console(width=200))
     monkeypatch.setattr(cli.finviz, "screener_tickers", lambda url: ["SCRN", "HZO"])
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.setattr(history, "HISTORY_PATH", tmp_path / "history.csv")
     return tmp_path
 
 
@@ -153,3 +154,10 @@ def test_serve_asks_pin_in_terminal(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert "4 to 8 digits" in result.output  # "12" refused, asked again
     assert real(path).verify("4821")
+
+
+def test_analyze_saves_history(offline):
+    runner.invoke(cli.app, ["analyze", "HZO"])
+    runner.invoke(cli.app, ["analyze", "HZO", "NOPE"])  # NOPE: data error, not saved
+    rows = history.read(offline / "history.csv")
+    assert [r["ticker"] for r in rows] == ["HZO", "HZO"] and rows[0]["price"] > 0

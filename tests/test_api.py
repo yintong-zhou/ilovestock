@@ -18,6 +18,7 @@ def client(tmp_path, fake_yf, fake_finviz):
         config_path=tmp_path / "config.toml",
         provider=FinvizProvider(YahooProvider()),
         static_dir=tmp_path / "no-dist",
+        history_path=tmp_path / "history.csv",
     )
     c = TestClient(app, base_url="http://127.0.0.1")
     c.pin_path = tmp_path / "pin.json"
@@ -154,3 +155,24 @@ def test_parallel_guesses_cannot_skip_throttle(client):
             )
         )
     assert codes.count(401) == pinmod.MAX_FAILS and codes.count(429) == 3
+
+
+def test_history_api(client):
+    assert client.get("/api/history").status_code == 401  # locked
+    unlocked(client)
+    assert client.get("/api/history").json() == []
+    client.post("/api/analyze", json={"tickers": ["HZO", "WLST"]})
+    client.post("/api/analyze", json={"tickers": ["HZO"]})
+    rows = client.get("/api/history").json()
+    assert [r["ticker"] for r in rows] == ["HZO", "HZO"]  # WLST: data error, not saved
+    rid = rows[0]["id"]
+
+    r = client.patch(f"/api/history/{rid}", json={"note": "watching", "stop": 1.5})
+    assert r.status_code == 200 and r.json()["note"] == "watching" and r.json()["edited_at"]
+    assert client.patch(f"/api/history/{rid}", json={"verdict": "MAYBE"}).status_code == 422
+    assert client.patch("/api/history/nope", json={"note": "x"}).status_code == 404
+
+    assert client.delete(f"/api/history/{rid}").status_code == 204
+    assert len(client.get("/api/history").json()) == 1
+    assert client.delete("/api/history", params={"ticker": "hzo"}).status_code == 204
+    assert client.get("/api/history").json() == []
