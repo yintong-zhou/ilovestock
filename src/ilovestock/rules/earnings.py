@@ -31,7 +31,8 @@ def post_earnings(
     thr = f"{REACTION_SESSIONS} session, {BIG_REACTION_SESSIONS} if move >= {BIG_REACTION_PCT}%"
     if last is None:
         if next_source == "Finviz":  # Finviz shows the last report until the next is announced
-            return CriterionResult(name, Status.PASS, None, thr, "next report already announced")
+            value, note = "no recent report", "next report already announced"
+            return CriterionResult(name, Status.PASS, value, thr, f"source: Finviz; {note}")
         return CriterionResult(name, Status.ND, None, thr, "last report date not available")
     closes = daily["Close"]
     day = pd.Timestamp(last)

@@ -35,7 +35,11 @@ def _row(stmt: pd.DataFrame, *names: str) -> list[float | None]:
 def session_end(metadata: dict) -> pd.Timestamp | None:
     """Today's regular close from Yahoo (13:00 on early-close days), New York time."""
     end = ((metadata or {}).get("currentTradingPeriod") or {}).get("regular", {}).get("end")
-    return pd.Timestamp(end, unit="s", tz="UTC").tz_convert(MARKET_TZ) if end else None
+    if end is None:
+        return None
+    # yfinance 1.7 gives a tz-aware Timestamp; the raw Yahoo API gives epoch seconds
+    ts = pd.Timestamp(end, unit="s") if isinstance(end, int | float) else pd.Timestamp(end)
+    return (ts if ts.tzinfo else ts.tz_localize("UTC")).tz_convert(MARKET_TZ)
 
 
 def drop_partial_bar(

@@ -115,7 +115,8 @@ def analyze(
             _fail(f"benchmark {BENCHMARK} not available: {e}")
     print_report(results, detail, console)
     if saved := history.append(results, datetime.now()):
-        console.print(f"[dim]History: {saved} analyses added to {history.HISTORY_PATH}[/]")
+        noun = "analysis" if saved == 1 else "analyses"
+        console.print(f"[dim]History: {saved} {noun} added to {history.HISTORY_PATH}[/]")
     if formats:
         for path in export.write_reports(results, formats, out_dir, cfg, datetime.now()):
             console.print(f"Report written: {path}")

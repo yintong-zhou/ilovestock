@@ -243,9 +243,16 @@ def test_screener_too_large_stops_after_first_page(monkeypatch):
     assert len(calls) == 1
 
 
-def test_early_close_uses_yahoo_session_end(fake_yf):
+@pytest.mark.parametrize(
+    "end",
+    [
+        pd.Timestamp("2026-10-19 13:00", tz="America/New_York"),  # yfinance 1.7 (real format)
+        1792429200,  # raw Yahoo API: epoch seconds
+    ],
+)
+def test_early_close_uses_yahoo_session_end(fake_yf, end):
     df = YahooProvider().history("HZO")  # last bar 2026-10-19
-    close = session_end({"currentTradingPeriod": {"regular": {"end": 1792429200}}})
+    close = session_end({"currentTradingPeriod": {"regular": {"end": end}}})
     assert close == pd.Timestamp("2026-10-19 13:00", tz="America/New_York")
     now = pd.Timestamp("2026-10-19 14:00", tz="America/New_York")  # after a 13:00 close
     assert len(drop_partial_bar(df, now, close)) == len(df)
