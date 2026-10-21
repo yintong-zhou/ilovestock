@@ -261,6 +261,7 @@ npm run build
 - Tests marked `slow` hit live Finviz to detect page changes. Run them on purpose with `pytest -m slow`.
 - Indicators are checked against TA-Lib, which is a dev dependency.
 - To re-record fixtures (this uses the network): `python execution/record_fixtures.py [TICKER] [FINVIZ_URL]`.
+- Project rules and release steps: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Project layout:
 
