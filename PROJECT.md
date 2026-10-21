@@ -137,7 +137,7 @@ r_multiple = 3           # take profit; below 2 → trade discarded
 entry_mode = "breakout"  # breakout | pullback | restart
 
 [fundamental]
-growth_basis = "qoq"     # qoq | yoy
+growth_basis = "yoy"     # yoy | qoq (see D2)
 sales_growth_min = 20
 eps_growth_min = 15
 roe_min = 15
@@ -211,19 +211,19 @@ No deadlines (spare-time development). Ordered by dependency.
 
 ## Open decisions
 **Before M3-M4:**
-- D1 ROE: the course text says "ROE > 15% Q/Q" but the screener table says "ROE > 15%". Level or change? No Proposal: ask.
+- D1 ROE: the course text says "ROE > 15% Q/Q" but the screener table says "ROE > 15%". Level or change? **Decided: level (ROE > 15%).**
 - D2 Q/Q definition: course = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. **Decided (2026-10-20): default `yoy` from Finviz, option `qoq` from yfinance.**
-- D3 Missing institutional data (ticker lacks it or the library fails). Proposal: criterion `N/D`, verdict NO-BUY reason "missing data", option `--allow-missing` to skip knowingly.
+- D3 Missing institutional data (ticker lacks it or the library fails). Proposal: criterion `N/D`, verdict NO-BUY reason "missing data", option `--allow-missing` to skip knowingly. **Decided: as proposed; with `--allow-missing` the verdict is `BUY*` (incomplete data), never a plain BUY.**
 - D4 Market cap thresholds: course names the bands (nano, micro, small, mid, large, giant) without numbers in the course material read. Proposal: start from Finviz bands, make them configurable.
 - D5 Stop algorithm for "most important previous low". Proposal: low of the consolidation or last pivot low over N weeks.
 - D6 Default entry mode. Proposal: `breakout`; `pullback`, `restart` as options.
-- D7 Consolidation/breakout check (correction < 50% / < 38%, volumes): blocking or informational in v1? No Proposal: ask.
-- D8 Intermediate "watchlist" state (fundamentals pass, technicals not yet). v1 keeps two states (BUY / NO-BUY) until decided.
+- D7 Consolidation/breakout check (correction < 50% / < 38%, volumes): blocking or informational in v1? **Decided: informational only (shown in the trade plan).**
+- D8 Intermediate "watchlist" state (fundamentals pass, technicals not yet). v1 keeps BUY / NO-BUY (plus `BUY*` from D3) until decided.
 
 **Before publishing:**
 - D9 License. **Decided: GPL-3.0.** Project name is decided: `ilovestock`. `finviz` is MIT, no constraint.
 - D10 Finviz ToS: library authors warn use may violate them. **Decided (2026-10-20): Finviz is the main source for fundamentals and a required dependency; yfinance is the per-field fallback and the price source. Warning in README and CLI output.**
-- D11 Web/graphical UI: not excluded, but chosen output is terminal + reports. Default: no GUI in v1. To confirm.
+- D11 Web/graphical UI: not excluded, but chosen output is terminal + reports. Default: no GUI in v1. **Decided (2026-10-20): local web app (`ilovestock serve`, 127.0.0.1 only, PIN set in the terminal) on the same core as the CLI.**
 
 ## Risks
 - yfinance is unofficial: blocking or format changes. Mitigation: disk cache, swappable provider, second price provider later.

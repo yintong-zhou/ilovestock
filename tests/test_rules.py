@@ -6,8 +6,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from ilovestock.analysis import analyze_many
 from ilovestock.config import load
 from ilovestock.models import CriterionResult, Fundamentals, Status, TradePlan, Verdict
+from ilovestock.providers.yahoo import YahooProvider
 from ilovestock.rules.earnings import earnings
 from ilovestock.rules.fundamental import fundamental, growth_pct, market_cap_band
 from ilovestock.rules.technical import technical
@@ -220,3 +222,14 @@ def test_allow_missing_skips_fundamental_nd_only():
 def test_non_finite_value_is_nd(value):
     c = CriterionResult("SMA 200d", Status.PASS, value, "> 10", "x")
     assert (c.status, c.value, c.note) == (Status.ND, None, "x; non-finite value")
+
+
+def test_analysis_error_stays_with_its_ticker(fake_yf):
+    class Broken(YahooProvider):
+        def history(self, t):
+            df = super().history(t)
+            return df if t == "^GSPC" else df.drop(columns="High")  # malformed prices
+
+    cfg = load(Path("does-not-exist.toml"))
+    (r,) = analyze_many(["HZO"], Broken(), cfg, date(2026, 10, 20))
+    assert r.verdict == Verdict.NO_BUY and r.error and r.reasons[0].startswith("Analysis error")

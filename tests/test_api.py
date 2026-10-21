@@ -1,5 +1,7 @@
 """Web API: PIN gate, config, analysis on recorded data (offline)."""
 
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -140,3 +142,15 @@ def test_analyze_bad_input(client, body):
 
 def test_frontend_not_built_message(client):
     assert "npm run build" in client.get("/").text
+
+
+def test_parallel_guesses_cannot_skip_throttle(client):
+    unlocked(client)
+    client.post("/api/pin/lock")
+    with ThreadPoolExecutor(8) as pool:
+        codes = list(
+            pool.map(
+                lambda _: client.post("/api/pin/unlock", json={"pin": "0000"}).status_code, range(8)
+            )
+        )
+    assert codes.count(401) == pinmod.MAX_FAILS and codes.count(429) == 3

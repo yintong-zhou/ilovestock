@@ -3,8 +3,9 @@ from pathlib import Path
 
 import pytest
 
+from ilovestock import indicators as ind
 from ilovestock.config import ConfigError, load
-from ilovestock.rules.trade_plan import risk_band, size_position, trade_plan
+from ilovestock.rules.trade_plan import entry_level, risk_band, size_position, trade_plan
 
 CFG = load(Path("does-not-exist.toml"))
 
@@ -71,3 +72,16 @@ def test_entry_modes(hzo_daily, mode):
 
 def test_plan_needs_history(hzo_daily):
     assert trade_plan(hzo_daily.iloc[-20:], CFG) is None
+
+
+@pytest.mark.parametrize(
+    "last_day,week",
+    [
+        ("2026-10-16", -1),  # data ends Friday: that week is complete, it is the previous one
+        ("2026-10-19", -2),  # Monday: the last bar is the running week
+    ],
+)
+def test_restart_uses_last_completed_week(hzo_daily, last_day, week):
+    daily = hzo_daily.loc[:last_day]
+    w = ind.weekly(daily)
+    assert entry_level(daily, w, w["High"], "restart") == w["High"].iloc[week]

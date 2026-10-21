@@ -29,11 +29,15 @@ def analyze(
     except Exception as e:  # unofficial sources: report per ticker, keep going
         return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Data error: {e}"], error=str(e))
 
-    fund_results = fundamental(fund, daily, cfg)
-    tech_results = technical(daily, bench_close)
-    earn = earnings(fund.next_earnings, today, fund.sources.get("next_earnings", ""))
-    plan = trade_plan(daily, cfg)
-    v, reasons = verdict(fund_results, tech_results, earn, plan, allow_missing)
+    try:
+        fund_results = fundamental(fund, daily, cfg)
+        tech_results = technical(daily, bench_close)
+        earn = earnings(fund.next_earnings, today, fund.sources.get("next_earnings", ""))
+        plan = trade_plan(daily, cfg)
+        v, reasons = verdict(fund_results, tech_results, earn, plan, allow_missing)
+    except Exception as e:  # malformed data: this ticker fails, not the benchmark or the run
+        msg = f"{type(e).__name__}: {e}"
+        return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Analysis error: {msg}"], error=msg)
     return TickerAnalysis(
         ticker=ticker,
         verdict=v,
@@ -54,7 +58,10 @@ def analyze_many(
     allow_missing: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> list[TickerAnalysis]:
-    """Fetch the benchmark once, then analyze each ticker. Benchmark failure raises."""
+    """Fetch the benchmark once, then analyze each ticker.
+
+    Only a benchmark failure raises: each ticker's errors are reported in its result.
+    """
     bench = provider.history(BENCHMARK)["Close"]
     results = []
     for t in tickers:

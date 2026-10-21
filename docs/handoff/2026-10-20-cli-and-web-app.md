@@ -1,11 +1,19 @@
 ---
 type: handoff
 date: 2026-10-20
-status: pronto-per-commit
+status: superato
 seq: 1
 prev: nessuno
 tags: [ilovestock, cli, web-app, finviz, pin, m6, m7]
 ---
+
+> **Aggiornamento 2026-10-21.** Questo file è la fotografia del 20/10. Da allora, su `main`:
+> CI verde (fix `pythonpath` di pytest), UI compilata in `src/ilovestock/static` e inclusa nel
+> pacchetto (non più `web/dist`), `CONTRIBUTING.md` e screenshot AAPL nel README, correzioni
+> dell'audit Codex (verdetto `BUY*` con `--allow-missing`, solo prezzi in USD, cache per sessione
+> di New York, PIN impostato nel terminale da `ilovestock serve`, niente CORS). I numeri dei
+> test qui sotto sono di quella data. Per il server di prova: imposta il PIN con
+> `PinStore(path).set(...)` prima di avviarlo, perché l'API non permette più di crearlo.
 
 ## Obiettivo
 
@@ -135,7 +143,7 @@ Solo quelli non ancora committati:
 
 - **Comandi:** usare `.venv/Scripts/python`, `.venv/Scripts/ruff`, `.venv/Scripts/ilovestock`
   (Windows, venv nella root). Il frontend si compila con `npm run build` dentro `web/`; il
-  server serve `web/dist`.
+  server serve `src/ilovestock/static` (vedi l'aggiornamento in cima).
 - **Prove manuali della web app:** non usare `ilovestock serve` sul PIN reale dell'utente. Usa
   un server di prova con `create_app(pin_path=..., config_path=...)` in una cartella
   temporanea; quello di questa sessione era `scratchpad/serve_test.py` sulla porta 8765, con PIN

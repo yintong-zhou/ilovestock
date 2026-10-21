@@ -5,6 +5,7 @@ The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 """
 
 import dataclasses
+import threading
 from datetime import date
 from pathlib import Path
 
@@ -86,13 +87,20 @@ def create_app(
     def login(response: Response) -> None:
         response.set_cookie(COOKIE, sessions.new(), httponly=True, samesite="strict")
 
+    check_lock = threading.Lock()  # routes run in a thread pool: one PIN check at a time
+
     def check_pin(pin: str) -> None:
-        if wait := throttle.wait_seconds():
-            raise HTTPException(429, f"Too many attempts. Try again in {wait} s.")
-        if not pins.verify(pin):
-            throttle.failed()
-            raise HTTPException(401, "Wrong PIN")
-        throttle.succeeded()
+        # check + verify + count as one step, so parallel guesses can't slip past the throttle.
+        # ponytail: the lockout is global; every local client is 127.0.0.1, so a local process
+        # can keep it engaged (it could also just stop the server). Per-client limits need clients
+        # that can be told apart.
+        with check_lock:
+            if wait := throttle.wait_seconds():
+                raise HTTPException(429, f"Too many attempts. Try again in {wait} s.")
+            if not pins.verify(pin):
+                throttle.failed()
+                raise HTTPException(401, "Wrong PIN")
+            throttle.succeeded()
 
     def session(request: Request) -> None:
         if not sessions.valid(request.cookies.get(COOKIE)):
@@ -147,7 +155,9 @@ def create_app(
             cfg = cfgmod.load(cfg_path)
             tickers = [inputs.normalize(t) for t in body.tickers]
             if body.finviz_url:
-                tickers = inputs.merge(tickers, finviz.screener_tickers(body.finviz_url))
+                tickers = inputs.merge(
+                    tickers, finviz.screener_tickers(body.finviz_url, MAX_TICKERS)
+                )
         except (cfgmod.ConfigError, ValueError, finviz.FinvizError) as e:
             raise HTTPException(422, str(e)) from e
         if not tickers:

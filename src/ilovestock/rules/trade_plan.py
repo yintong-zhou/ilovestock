@@ -40,7 +40,10 @@ def entry_level(daily: pd.DataFrame, weekly: pd.DataFrame, upper: pd.Series, mod
     if mode == "pullback":
         return float(upper.iloc[-1])
     if mode == "restart":
-        return float(weekly["High"].iloc[-2])
+        # Data reaching Friday closes the last weekly bar: it is then the last completed week.
+        # ponytail: a Friday holiday leaves the week looking open, so one week older is used.
+        done = daily.index[-1] == weekly.index[-1]
+        return float(weekly["High"].iloc[-1 if done else -2])
     return float(daily["Close"].iloc[-1])
 
 

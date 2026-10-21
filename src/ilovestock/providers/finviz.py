@@ -127,11 +127,12 @@ def parse_screener_page(html: str) -> tuple[list[str], int]:
     return list(tickers), int(total.group(1)) if total else 0
 
 
-def screener_tickers(url: str) -> list[str]:
+def screener_tickers(url: str, max_results: int | None = None) -> list[str]:
     """All tickers from a Finviz screener URL copied from the site.
 
     The `finviz` lib 2.0.0 Screener no longer parses the current site (row count markup
     changed), so we read the ticker links directly. Contract test: tests/test_providers.py (slow).
+    With max_results, a larger screener is refused after the first page, not fully downloaded.
     """
     if not url.startswith("https://finviz.com/screener"):
         raise FinvizError("invalid URL: must start with https://finviz.com/screener")
@@ -141,6 +142,10 @@ def screener_tickers(url: str) -> list[str]:
         resp = requests.get(url, params={"r": row}, headers={"User-Agent": UA}, timeout=30)
         resp.raise_for_status()
         page, total = parse_screener_page(resp.text)
+        if max_results is not None and total > max_results:
+            raise FinvizError(
+                f"screener has {total} results: max {max_results}, narrow the filters"
+            )
         if not page:
             break
         tickers += page

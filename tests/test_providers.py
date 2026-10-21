@@ -224,3 +224,18 @@ def test_yahoo_drops_incomplete_rows(monkeypatch):
 )
 def test_cache_session_tag(now, tag):
     assert session_tag(pd.Timestamp(now, tz="America/New_York")) == tag
+
+
+def test_screener_too_large_stops_after_first_page(monkeypatch):
+    calls = []
+
+    class Resp:
+        text = (FIX / "finviz_screener_p1.html").read_text(encoding="utf-8")  # 261 results
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(finviz.requests, "get", lambda *a, **k: calls.append(1) or Resp())
+    with pytest.raises(finviz.FinvizError, match="261 results"):
+        finviz.screener_tickers("https://finviz.com/screener.ashx?v=111", max_results=50)
+    assert len(calls) == 1
