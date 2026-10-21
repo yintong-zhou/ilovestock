@@ -1,5 +1,7 @@
 """Analysis history CSV: append from CLI/web, read typed rows, edit and delete from the web."""
 
+import os
+import time
 from datetime import date, datetime
 
 import pytest
@@ -100,3 +102,14 @@ def test_unknown_id(path):
         history.update("nope", {"note": "x"}, path)
     with pytest.raises(KeyError):
         history.delete(path, ids=["nope"])
+
+
+def test_lock_shared_with_other_processes(path, monkeypatch):
+    lock = path.with_name(path.name + ".lock")
+    lock.write_text("")  # another process is writing
+    monkeypatch.setattr(history, "LOCK_TIMEOUT", 0.2)
+    with pytest.raises(history.HistoryError, match="busy"):
+        history.append([AAA], NOW, path)
+    old = time.time() - history.STALE_LOCK - 5
+    os.utime(lock, (old, old))  # left by a crashed process
+    assert history.append([AAA], NOW, path) == 1 and not lock.exists()

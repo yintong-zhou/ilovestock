@@ -89,7 +89,8 @@ def detail(r: TickerAnalysis) -> Panel:
     style = VERDICT_STYLE[r.verdict]
     return Panel(
         Group(*parts),
-        title=f"{r.ticker}: {r.verdict}  (data as of {r.data_date})",
+        title=f"{r.ticker}: {r.verdict}  (prices as of {r.data_date}, "
+        f"fundamentals as of {r.fundamentals_date or 'N/D'})",
         border_style=style,
     )
 

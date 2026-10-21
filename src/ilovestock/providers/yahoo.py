@@ -32,14 +32,26 @@ def _row(stmt: pd.DataFrame, *names: str) -> list[float | None]:
     return []
 
 
-def drop_partial_bar(df: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
+def session_end(metadata: dict) -> pd.Timestamp | None:
+    """Today's regular close from Yahoo (13:00 on early-close days), New York time."""
+    end = ((metadata or {}).get("currentTradingPeriod") or {}).get("regular", {}).get("end")
+    return pd.Timestamp(end, unit="s", tz="UTC").tz_convert(MARKET_TZ) if end else None
+
+
+def drop_partial_bar(
+    df: pd.DataFrame, now: pd.Timestamp, close: pd.Timestamp | None = None
+) -> pd.DataFrame:
     """Drop today's bar while the session is still open: the method uses end-of-day data.
 
-    `now` is New York time. ponytail: early-close days (13:00) keep dropping the bar until 16:00.
+    `now` is New York time; `close` is today's session end when Yahoo gives it, else 16:00.
     """
-    if len(df) and df.index[-1].date() == now.date() and now.hour < MARKET_CLOSE_HOUR:
-        return df.iloc[:-1]
-    return df
+    if not len(df) or df.index[-1].date() != now.date():
+        return df
+    if close is not None and close.date() == now.date():
+        still_open = now < close
+    else:
+        still_open = now.hour < MARKET_CLOSE_HOUR
+    return df.iloc[:-1] if still_open else df
 
 
 class YahooProvider:
@@ -49,12 +61,13 @@ class YahooProvider:
         if df.empty:
             raise DataError(f"{ticker}: no prices from Yahoo")
         # thresholds and the S&P 500 benchmark are in USD: other currencies would mix units
-        currency = (t.history_metadata or {}).get("currency")
+        meta = t.history_metadata or {}
+        currency = meta.get("currency")
         if currency != "USD":
             raise DataError(f"{ticker}: quoted in {currency or 'unknown currency'}, not USD")
         df = df.dropna(subset=["Open", "High", "Low", "Close"])  # incomplete rows = missing data
         df.index = pd.DatetimeIndex(df.index).tz_localize(None).normalize()
-        df = drop_partial_bar(df, pd.Timestamp.now(tz=MARKET_TZ))
+        df = drop_partial_bar(df, pd.Timestamp.now(tz=MARKET_TZ), session_end(meta))
         if df.empty:
             raise DataError(f"{ticker}: no complete daily bar from Yahoo")
         return df.reindex(columns=COLUMNS)

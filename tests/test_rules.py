@@ -10,9 +10,14 @@ from ilovestock.analysis import analyze_many
 from ilovestock.config import load
 from ilovestock.models import CriterionResult, Fundamentals, Status, TradePlan, Verdict
 from ilovestock.providers.yahoo import YahooProvider
-from ilovestock.rules.earnings import earnings
+from ilovestock.rules.earnings import earnings, post_earnings
 from ilovestock.rules.fundamental import fundamental, growth_pct, market_cap_band
-from ilovestock.rules.technical import technical
+from ilovestock.rules.technical import (
+    breakout_volume,
+    consolidation,
+    donchian_breakout,
+    technical,
+)
 from ilovestock.rules.verdict import verdict
 
 CFG = load(Path("does-not-exist.toml"))
@@ -145,8 +150,41 @@ def test_earnings(next_date, status):
 def test_technical_on_recorded_data(hzo_daily, bench_close):
     r = {c.name.split()[0]: c.status for c in technical(hzo_daily, bench_close)}
     # values checked against the recorded HZO series (Oct 2026)
-    assert r == {"Relative": Status.PASS, "Donchian": Status.FAIL, "DMI": Status.FAIL,
-                 "SMA": Status.PASS}  # fmt: skip
+    assert r == {"Relative": Status.PASS, "Donchian": Status.FAIL, "Consolidation": Status.PASS,
+                 "Breakout": Status.FAIL, "DMI": Status.FAIL, "SMA": Status.PASS}  # fmt: skip
+
+
+def _weeks(highs, lows, volumes, end="2026-10-16"):
+    """Daily bars, one per weekday, from weekly (high, low, volume); close = high."""
+    days = pd.bdate_range(end=end, periods=5 * len(highs))
+    rows = [
+        (h, h, lo, h, v / 5)
+        for h, lo, v in zip(highs, lows, volumes, strict=True)
+        for _ in range(5)
+    ]
+    return pd.DataFrame(rows, index=days, columns=["Open", "High", "Low", "Close", "Volume"])
+
+
+@pytest.mark.parametrize(
+    "low,volume,expected",
+    [
+        (80, 300, (Status.PASS, Status.PASS, Status.PASS)),  # 20% base, breakout on volume
+        (80, 50, (Status.PASS, Status.PASS, Status.FAIL)),  # no volume: not a valid breakout
+        (40, 300, (Status.PASS, Status.FAIL, Status.PASS)),  # 60% correction: too deep
+    ],
+)
+def test_breakout_needs_base_and_volume(low, volume, expected):
+    daily = _weeks([100] * 10 + [110], [low] * 10 + [100], [100] * 10 + [volume])
+    got = tuple(f(daily).status for f in (donchian_breakout, consolidation, breakout_volume))
+    assert got == expected
+
+
+def test_running_week_is_not_a_breakout():
+    done = _weeks([100] * 11, [80] * 11, [100] * 11)
+    monday = pd.DataFrame([[120, 120, 119, 120, 50]], columns=done.columns,
+                          index=[pd.Timestamp("2026-10-19")])  # fmt: skip
+    daily = pd.concat([done, monday])  # breaks out on Monday, week not closed yet
+    assert donchian_breakout(daily).status == Status.FAIL
 
 
 def test_technical_short_history_is_nd(hzo_daily, bench_close):
@@ -233,3 +271,30 @@ def test_analysis_error_stays_with_its_ticker(fake_yf):
     cfg = load(Path("does-not-exist.toml"))
     (r,) = analyze_many(["HZO"], Broken(), cfg, date(2026, 10, 20))
     assert r.verdict == Verdict.NO_BUY and r.error and r.reasons[0].startswith("Analysis error")
+
+
+def _closes(*values, end="2026-10-20"):
+    return pd.DataFrame({"Close": values}, index=pd.bdate_range(end=end, periods=len(values)))
+
+
+@pytest.mark.parametrize(
+    "closes,end,last,amc,status",
+    [
+        # report Mon 10-19 after the close: reaction is Tue 10-20 (+2%), 1 session is enough
+        ((100, 100, 100, 100, 102), "2026-10-20", date(2026, 10, 19), True, Status.PASS),
+        # same report, the reaction session is not in the data yet
+        ((100, 100, 100, 100), "2026-10-19", date(2026, 10, 19), True, Status.FAIL),
+        # before the open on 10-16: +8% reaction, only 3 sessions of the 5 needed
+        ((100, 100, 108, 107, 109), "2026-10-20", date(2026, 10, 16), False, Status.FAIL),
+        # -6% reaction 5 sessions ago: waited enough
+        ((100, 94, 95, 96, 97, 96), "2026-10-20", date(2026, 10, 14), False, Status.PASS),
+    ],
+)
+def test_post_earnings_waits_for_reaction(closes, end, last, amc, status):
+    assert post_earnings(last, amc, _closes(*closes, end=end)).status == status
+
+
+def test_post_earnings_unknown_date():
+    daily = _closes(100, 101)
+    assert post_earnings(None, None, daily, "Finviz").status == Status.PASS  # next announced
+    assert post_earnings(None, None, daily, "Yahoo").status == Status.ND

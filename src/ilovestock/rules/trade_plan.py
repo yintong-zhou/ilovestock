@@ -3,7 +3,8 @@
 Defaults chosen for open decisions (configurable where the course allows):
 - D5 stop: lowest low of the previous 10 weeks (the consolidation low = lower Donchian band).
 - D6 entry: breakout = last close (price already above the band); pullback = retest of the
-  upper Donchian band; restart = above the previous completed week's high.
+  upper Donchian band; restart = above the last completed week's high.
+- D7 consolidation and breakout volume are technical criteria (rules/technical.py), not here.
 """
 
 import math
@@ -40,24 +41,8 @@ def entry_level(daily: pd.DataFrame, weekly: pd.DataFrame, upper: pd.Series, mod
     if mode == "pullback":
         return float(upper.iloc[-1])
     if mode == "restart":
-        # Data reaching Friday closes the last weekly bar: it is then the last completed week.
-        # ponytail: a Friday holiday leaves the week looking open, so one week older is used.
-        done = daily.index[-1] == weekly.index[-1]
-        return float(weekly["High"].iloc[-1 if done else -2])
+        return float(ind.completed_weeks(daily)["High"].iloc[-1])
     return float(daily["Close"].iloc[-1])
-
-
-def consolidation_info(w: pd.DataFrame) -> list[str]:
-    """D7: informational only, does not affect the verdict."""
-    base = w.iloc[-ind.DONCHIAN_WEEKS - 1 : -1]
-    hi, lo = base["High"].max(), base["Low"].min()
-    depth = (hi - lo) / hi * 100
-    label = "< 38%" if depth < 38 else "< 50%" if depth < 50 else ">= 50% (too deep)"
-    vol_ratio = w["Volume"].iloc[-1] / base["Volume"].mean()
-    return [
-        f"Consolidation correction {ind.DONCHIAN_WEEKS}w: {depth:.1f}% ({label})",
-        f"Current week volume / {ind.DONCHIAN_WEEKS}w average: {vol_ratio:.2f}x",
-    ]
 
 
 def trade_plan(daily: pd.DataFrame, cfg: Config) -> TradePlan | None:
@@ -76,7 +61,6 @@ def trade_plan(daily: pd.DataFrame, cfg: Config) -> TradePlan | None:
         risk_band=risk_band(cfg.risk_pct),
         trailing_stop_10w=stop,
         trailing_stop_8w=round(float(lower_fast.iloc[-1]), 2),
-        info=consolidation_info(w),
     )
     risk = entry - stop
     if risk <= 0:
@@ -89,7 +73,8 @@ def trade_plan(daily: pd.DataFrame, cfg: Config) -> TradePlan | None:
     plan.effective_risk = round(plan.shares * risk, 2)
     plan.position_value = round(plan.shares * entry, 2)
     plan.info.append(
-        f"Scale-out: ½ at {entry + risk:.2f} (1R), ½ above {entry + 3 * risk:.2f} (3R)"
+        f"Scale-out: ½ at {entry + risk:.2f} (1R), ½ at the target {plan.target:.2f} "
+        f"({cfg.r_multiple:g}R)"
     )
     if cfg.r_multiple < MIN_R_MULTIPLE:
         plan.discarded = f"R:R {cfg.r_multiple:g} < {MIN_R_MULTIPLE:g}"

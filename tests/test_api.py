@@ -176,3 +176,9 @@ def test_history_api(client):
     assert len(client.get("/api/history").json()) == 1
     assert client.delete("/api/history", params={"ticker": "hzo"}).status_code == 204
     assert client.get("/api/history").json() == []
+
+
+def test_pin_input_checked_before_hashing(client):
+    assert client.post("/api/pin/unlock", json={"pin": "1" * 100}).status_code == 422
+    big = "x" * (70 * 1024)
+    assert client.post("/api/pin/unlock", json={"pin": big}).status_code == 413

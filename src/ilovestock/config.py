@@ -8,6 +8,7 @@ from pathlib import Path
 
 CONFIG_PATH = Path.home() / ".config" / "ilovestock" / "config.toml"
 MAX_RISK_PCT = 2.0  # course: above 2% per trade destroys the account
+MAX_POSITION_PCT = 10.0  # course: a single stock is always at most 10% of the portfolio
 ENTRY_MODES = ("breakout", "pullback", "restart")
 GROWTH_BASES = ("qoq", "yoy")
 
@@ -17,7 +18,7 @@ TEMPLATE = """\
 [portfolio]
 capital = 20000          # equity portfolio capital
 risk_pct = 1.0           # max loss per trade (%); above 2 -> rejected
-max_position_pct = 10    # max weight per stock (%)
+max_position_pct = 10    # max weight per stock (%); above 10 -> rejected
 
 [plan]
 r_multiple = 3           # take profit in R; below 2 -> trade discarded
@@ -77,8 +78,16 @@ class Config:
             raise ConfigError(
                 f"risk_pct {self.risk_pct} rejected: must be > 0 and <= {MAX_RISK_PCT}"
             )
-        if not 0 < self.max_position_pct <= 100:
-            raise ConfigError("max_position_pct must be between 0 and 100")
+        if not 0 < self.max_position_pct <= MAX_POSITION_PCT:
+            raise ConfigError(
+                f"max_position_pct {self.max_position_pct} rejected: must be > 0 and "
+                f"<= {MAX_POSITION_PCT}"
+            )
+        for k in ("sales_growth_min", "eps_growth_min", "roe_min"):
+            if getattr(self, k) < 0:
+                raise ConfigError(f"{k} must be >= 0: the method looks for growth")
+        if not 0 < self.institutional_own_max <= 100:
+            raise ConfigError("institutional_own_max must be between 0 and 100")
         if self.r_multiple <= 0:
             raise ConfigError("r_multiple must be > 0")
         if self.entry_mode not in ENTRY_MODES:

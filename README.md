@@ -34,8 +34,8 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 
 - **Per-criterion results.** Each criterion reports its value, threshold and status: `PASS`, `FAIL` or `N/D`. Missing data is always `N/D` and never counts as a pass.
 - **Fundamental analysis.** Sales and EPS growth, ROE, institutional ownership and transactions, dividend yield, market cap band.
-- **Earnings check.** No entry when the next earnings report is 10 days away or less.
-- **Four technical confirmations.** Relative strength vs the S&P 500, Donchian breakout, DMI/ADX and SMA 200, all with fixed parameters.
+- **Earnings check.** No entry when the next earnings report is 10 days away or less, nor before the market has reacted to the last one.
+- **Technical confirmations.** Relative strength vs the S&P 500, Donchian breakout on the weekly close after a consolidation, with volume, DMI/ADX and SMA 200, all with fixed parameters.
 - **Trade plan.** Entry, technical stop, take profit in R multiples, and position sizing capped by maximum exposure.
 - **Report files.** Markdown, CSV and JSON export, each with data date, sources and disclaimer.
 - **Flexible input.** Tickers on the command line, a watchlist file and a Finviz screener URL can be combined; duplicates are removed.
@@ -104,6 +104,7 @@ A watchlist is a text or CSV file with one ticker per line. Lines starting with 
 | `--growth-basis yoy\|qoq` | Growth vs the same quarter last year (Finviz, default), or vs the previous quarter (Yahoo) |
 | `--entry-mode breakout\|pullback\|restart` | Entry point used for the trade plan |
 | `--allow-missing` | `N/D` fundamental criteria don't block: the verdict is **BUY\*** (incomplete data) instead of BUY, with the `N/D` criteria listed |
+| `--max-tickers` | Refuse runs with more tickers than this (default 50, the web app's limit) |
 | `--detail` | Per-criterion panel for each ticker |
 | `--export md,csv,json` | Write report files (any combination of the three formats) |
 | `--out-dir DIR` | Report directory (default `reports`) |
@@ -141,7 +142,7 @@ The config file is `~/.config/ilovestock/config.toml`. CLI options override the 
 [portfolio]
 capital = 20000          # equity portfolio capital
 risk_pct = 1.0           # max loss per trade (%); above 2 -> rejected
-max_position_pct = 10    # max weight per stock (%)
+max_position_pct = 10    # max weight per stock (%); above 10 -> rejected
 
 [plan]
 r_multiple = 3           # take profit in R; below 2 -> trade discarded
@@ -202,17 +203,23 @@ ilovestock serve                                   # http://127.0.0.1:8000
 | Indicator | Timeframe | Condition |
 |---|---|---|
 | Relative strength vs S&P 500 | weekly | RS above its 52-week SMA |
-| Donchian channel, 10 weeks | weekly | Price above the highest high of the 10 previous weeks |
+| Donchian channel, 10 weeks | weekly | Weekly close above the highest high of the 10 previous weeks |
+| Consolidation, 10 weeks | weekly | The 10 weeks before the breakout corrected less than 50% (high to low) |
+| Breakout volume | weekly | Breakout week volume above the 10-week average |
 | DMI, 18 days, Wilder smoothing | daily | ADX rising and below both +DI and −DI |
 | SMA 200 | daily | Price above the SMA |
+| After last earnings | daily | At least 1 session of reaction after the report, 5 if the reaction moved the price 5% or more |
+
+Weekly criteria use completed weeks only: a breakout counts once the week has closed, as in the course. During the week they show the last completed week.
 
 ### Trade plan
 
-- **Entry**: `breakout` buys at the last close. `pullback` uses the upper Donchian band. `restart` uses the previous week's high.
+- **Entry**: `breakout` buys at the last close. `pullback` uses the upper Donchian band. `restart` uses the last completed week's high.
 - **Stop**: the lowest low of the previous 10 weeks. It is a technical stop, not a monetary one.
 - **Take profit**: `entry + r_multiple × (entry − stop)`. If `r_multiple` is below 2, the trade is discarded.
 - **Shares**: `floor(capital × risk_pct / (entry − stop))`, reduced if the position would exceed `max_position_pct`. The output says which of the two limits set the share count.
-- **For information only**: initial trailing stops (Donchian 10 and 8 weeks), a scale-out hint (½ at 1R, ½ above 3R), how deep the consolidation corrected, and the breakout volume.
+- **Shares** are also capped by the course limit: `max_position_pct` above 10 is rejected.
+- **For information only**: initial trailing stops (Donchian 10 and 8 weeks) and a scale-out hint (½ at 1R, ½ at the target).
 
 ## Data and limits
 
@@ -227,8 +234,8 @@ Each criterion's note shows where its value came from (`source: Finviz` or `sour
 
 > [!NOTE]
 > - Neither source is official. Either can block requests or change its format without notice. Prices and fundamentals are cached for one day in `~/.cache/ilovestock`.
-> - Finviz "Sales Q/Q" and "EPS Q/Q" compare with the same quarter last year, so the default growth basis is `yoy`. The course defines growth vs the previous quarter: use `--growth-basis qoq` to compute it from Yahoo quarters (usually only 4–5 are available).
-> - Finviz shows the earnings date without a year, and keeps the last report date until the next one is announced. A past date is ignored and Yahoo's date is used instead.
+> - Finviz "Sales Q/Q" and "EPS Q/Q" compare with the same quarter last year, so the default growth basis is `yoy`. This is a deliberate deviation: the course defines growth vs the previous quarter. Use `--growth-basis qoq` to apply the course's definition, computed from Yahoo quarters (usually only 4–5 are available).
+> - Finviz shows the earnings date without a year, and keeps the last report date until the next one is announced. A past date is used as the last report (for the wait after earnings) and Yahoo's date is used as the next one.
 > - Finviz shows `-` for both "no dividend" and "missing". In that case the dividend yield is computed from Yahoo's dividend history.
 > - The `finviz` 2.0.0 screener no longer parses the current Finviz site, so ilovestock reads ticker links from the screener pages itself.
 > - The method uses end-of-day data. Recheck prices before acting.

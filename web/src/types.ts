@@ -38,6 +38,7 @@ export interface TickerAnalysis {
   data_date: string | null
   error: string | null
   price: number | null
+  fundamentals_date: string | null
 }
 
 export interface AnalyzeOut {

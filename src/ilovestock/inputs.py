@@ -5,6 +5,7 @@ from pathlib import Path
 
 TICKER_RE = re.compile(r"^[A-Z0-9.\-^]{1,10}$")
 HEADERS = {"TICKER", "SYMBOL"}
+MAX_TICKERS = 50  # one run: bounds Finviz/Yahoo requests, cache and history growth
 
 
 def normalize(ticker: str) -> str:

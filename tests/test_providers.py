@@ -6,7 +6,7 @@ import pytest
 
 from ilovestock.providers import finviz
 from ilovestock.providers.cache import CachedProvider, session_tag
-from ilovestock.providers.yahoo import YahooProvider, drop_partial_bar
+from ilovestock.providers.yahoo import YahooProvider, drop_partial_bar, session_end
 from tests.conftest import FIX, FakeTicker, raw_history
 
 
@@ -100,9 +100,9 @@ def test_finviz_value_parsers():
     "raw,today,expected",
     [
         ("Nov 02 AMC", date(2026, 10, 20), date(2026, 11, 2)),
-        ("Jul 23 BMO", date(2026, 10, 20), None),  # already reported: not the next one
+        ("Jul 23 BMO", date(2026, 10, 20), date(2026, 7, 23)),  # past: the last report
         ("Jan 25 AMC", date(2026, 12, 20), date(2027, 1, 25)),  # year rollover
-        ("Dec 20 AMC", date(2026, 1, 5), None),  # last report seen in January: not next December
+        ("Dec 20 AMC", date(2026, 1, 5), date(2025, 12, 20)),  # seen in January: last December
         ("Feb 29 BMO", date(2027, 2, 1), date(2028, 2, 29)),  # leap day, no crash
         ("-", date(2026, 10, 20), None),
     ],
@@ -121,7 +121,9 @@ def test_finviz_snapshot_on_recorded_responses():
         "inst_trans_pct": -1.02,
         "market_cap": pytest.approx(1.15e9),
         "dividend_yield_pct": None,  # "-": no dividend or missing -> fallback
-        "next_earnings": None,  # "Jul 23": last report
+        "next_earnings": None,  # "Jul 23 BMO": the last report, not the next
+        "last_earnings": date(2026, 7, 23),
+        "last_earnings_amc": False,
     }
     aapl = finviz.parse_snapshot(json.loads((FIX / "AAPL_finviz.json").read_text()), TODAY)
     assert aapl["dividend_yield_pct"] == 0.31 and aapl["next_earnings"] == date(2026, 11, 2)
@@ -239,3 +241,16 @@ def test_screener_too_large_stops_after_first_page(monkeypatch):
     with pytest.raises(finviz.FinvizError, match="261 results"):
         finviz.screener_tickers("https://finviz.com/screener.ashx?v=111", max_results=50)
     assert len(calls) == 1
+
+
+def test_early_close_uses_yahoo_session_end(fake_yf):
+    df = YahooProvider().history("HZO")  # last bar 2026-10-19
+    close = session_end({"currentTradingPeriod": {"regular": {"end": 1792429200}}})
+    assert close == pd.Timestamp("2026-10-19 13:00", tz="America/New_York")
+    now = pd.Timestamp("2026-10-19 14:00", tz="America/New_York")  # after a 13:00 close
+    assert len(drop_partial_bar(df, now, close)) == len(df)
+    assert len(drop_partial_bar(df, now)) == len(df) - 1  # without session info: 16:00
+
+
+def test_fundamentals_record_fetch_date(fake_yf, fake_finviz):
+    assert finviz.FinvizProvider(YahooProvider(), TODAY).fundamentals("HZO").fetched == TODAY

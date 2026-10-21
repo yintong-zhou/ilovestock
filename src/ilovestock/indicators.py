@@ -19,6 +19,17 @@ def weekly(daily: pd.DataFrame) -> pd.DataFrame:
     return daily[list(agg)].resample("W-FRI").agg(agg).dropna(subset=["Close"])
 
 
+def drop_running_week(weekly_data, last_day: pd.Timestamp):
+    """Drop the last weekly bar unless the data reaches its Friday: weekly signals count on the
+    weekly close (course). ponytail: a Friday holiday leaves the week open one week longer."""
+    done = len(weekly_data) and weekly_data.index[-1] == last_day
+    return weekly_data if done else weekly_data.iloc[:-1]
+
+
+def completed_weeks(daily: pd.DataFrame) -> pd.DataFrame:
+    return drop_running_week(weekly(daily), daily.index[-1])
+
+
 def sma(series: pd.Series, n: int) -> pd.Series:
     return series.rolling(n).mean()
 

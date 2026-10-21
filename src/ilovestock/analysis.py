@@ -8,7 +8,7 @@ import pandas as pd
 from ilovestock.config import Config
 from ilovestock.models import TickerAnalysis, Verdict
 from ilovestock.providers.base import BENCHMARK, MarketDataProvider
-from ilovestock.rules.earnings import earnings
+from ilovestock.rules.earnings import earnings, post_earnings
 from ilovestock.rules.fundamental import fundamental
 from ilovestock.rules.technical import technical
 from ilovestock.rules.trade_plan import trade_plan
@@ -31,7 +31,10 @@ def analyze(
 
     try:
         fund_results = fundamental(fund, daily, cfg)
-        tech_results = technical(daily, bench_close)
+        next_source = fund.sources.get("next_earnings", "")
+        tech_results = technical(daily, bench_close) + [
+            post_earnings(fund.last_earnings, fund.last_earnings_amc, daily, next_source)
+        ]
         earn = earnings(fund.next_earnings, today, fund.sources.get("next_earnings", ""))
         plan = trade_plan(daily, cfg)
         v, reasons = verdict(fund_results, tech_results, earn, plan, allow_missing)
@@ -48,6 +51,7 @@ def analyze(
         plan=plan,
         data_date=daily.index[-1].date(),
         price=round(float(daily["Close"].iloc[-1]), 2),
+        fundamentals_date=fund.fetched,
     )
 
 

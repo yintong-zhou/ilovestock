@@ -217,7 +217,7 @@ No deadlines (spare-time development). Ordered by dependency.
 - D4 Market cap thresholds: course names the bands (nano, micro, small, mid, large, giant) without numbers in the course material read. Proposal: start from Finviz bands, make them configurable.
 - D5 Stop algorithm for "most important previous low". Proposal: low of the consolidation or last pivot low over N weeks.
 - D6 Default entry mode. Proposal: `breakout`; `pullback`, `restart` as options.
-- D7 Consolidation/breakout check (correction < 50% / < 38%, volumes): blocking or informational in v1? **Decided: informational only (shown in the trade plan).**
+- D7 Consolidation/breakout check (correction < 50% / < 38%, volumes): blocking or informational in v1? **Decided (2026-10-21): blocking, as in the course: correction < 50% over the 10 weeks before the breakout, breakout week volume above the 10-week average, on completed weeks only.** Post-earnings: wait 1 session of reaction, 5 if the move is >= 5%.
 - D8 Intermediate "watchlist" state (fundamentals pass, technicals not yet). v1 keeps BUY / NO-BUY (plus `BUY*` from D3) until decided.
 
 **Before publishing:**

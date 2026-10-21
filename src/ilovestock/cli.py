@@ -64,6 +64,9 @@ def analyze(
     ] = None,
     out_dir: Annotated[Path, typer.Option(help="Report directory")] = Path("reports"),
     config_file: Annotated[Path | None, typer.Option("--config", help="File config")] = None,
+    max_tickers: Annotated[
+        int, typer.Option(help="Refuse larger runs (each ticker hits Finviz and Yahoo)", min=1)
+    ] = inputs.MAX_TICKERS,
 ) -> None:
     """Analyze one or more tickers with the course rules."""
     try:
@@ -87,12 +90,14 @@ def analyze(
     screened: list[str] = []
     if finviz_url:
         try:
-            screened = finviz.screener_tickers(finviz_url)
+            screened = finviz.screener_tickers(finviz_url, max_tickers)
         except Exception as e:
             _fail(f"Finviz import failed: {e}")
     all_tickers = inputs.merge(cli_tickers, wl, screened)
     if not all_tickers:
         _fail("no tickers: pass TICKER, --watchlist or --finviz-url")
+    if len(all_tickers) > max_tickers:
+        _fail(f"{len(all_tickers)} tickers: max {max_tickers} (raise it with --max-tickers)")
 
     provider = CachedProvider(finviz.FinvizProvider(YahooProvider()))
     console.print(f"[dim]{finviz.WARNING}[/]")

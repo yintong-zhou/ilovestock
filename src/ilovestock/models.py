@@ -51,8 +51,11 @@ class Fundamentals:
     sales_growth_yoy_pct: float | None = None  # Finviz "Sales Q/Q" (actually YoY)
     eps_growth_yoy_pct: float | None = None  # Finviz "EPS Q/Q" (actually YoY)
     dividend_yield_pct: float | None = None  # None -> computed from the dividend history
+    last_earnings: date | None = None  # Finviz, while the next date is not announced yet
+    last_earnings_amc: bool | None = None  # reported after the close: reaction the next session
     sources: dict[str, str] = field(default_factory=dict)  # field name -> "Finviz" | "Yahoo"
     note: str = ""  # why Finviz data is missing
+    fetched: date | None = None  # when this snapshot was taken (prices have their own date)
 
 
 @dataclass
@@ -84,3 +87,4 @@ class TickerAnalysis:
     data_date: date | None = None
     error: str | None = None
     price: float | None = None  # last close of the analyzed data
+    fundamentals_date: date | None = None  # when the fundamentals were fetched

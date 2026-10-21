@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import os
 from datetime import date
 from pathlib import Path
 
@@ -18,6 +19,13 @@ def session_tag(now: pd.Timestamp) -> str:
     """New York date, with '-open' before the close: prices cached intraday lack today's bar,
     so they are refetched once the session closes."""
     return f"{now:%Y-%m-%d}" + ("-open" if now.hour < MARKET_CLOSE_HOUR else "")
+
+
+def _replace(path: Path, write) -> None:
+    """Write next to the target, then swap: readers never see a half-written file."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    write(tmp)
+    os.replace(tmp, path)
 
 
 class CachedProvider:
@@ -39,7 +47,7 @@ class CachedProvider:
         if path.exists():
             return pd.read_csv(path, index_col=0, parse_dates=True)
         df = self.inner.history(ticker)
-        df.to_csv(path)
+        _replace(path, df.to_csv)
         return df
 
     def fundamentals(self, ticker: str) -> Fundamentals:
@@ -47,11 +55,12 @@ class CachedProvider:
         if path.exists():
             try:
                 raw = json.loads(path.read_text())
-                if raw["next_earnings"]:
-                    raw["next_earnings"] = date.fromisoformat(raw["next_earnings"])
+                for k in ("next_earnings", "last_earnings", "fetched"):
+                    if raw.get(k):
+                        raw[k] = date.fromisoformat(raw[k])
                 return Fundamentals(**raw)
             except (ValueError, KeyError, TypeError):  # corrupt or older format: refetch
                 pass
         f = self.inner.fundamentals(ticker)
-        path.write_text(json.dumps(dataclasses.asdict(f), default=str))
+        _replace(path, lambda p: p.write_text(json.dumps(dataclasses.asdict(f), default=str)))
         return f

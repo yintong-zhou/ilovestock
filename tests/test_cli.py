@@ -33,6 +33,9 @@ def test_precedence_default_file_cli(tmp_path):
         "[portfolio]\ncapital = nan\n",
         "[plan]\nr_multiple = inf\n",
         "[market_cap]\nsmall_max = 100\n",  # bands must increase: micro 300 > small 100
+        "[portfolio]\nmax_position_pct = 25\n",  # course: a stock is at most 10%
+        "[fundamental]\nroe_min = -5\n",
+        "[fundamental]\ninstitutional_own_max = 120\n",
     ],
 )
 def test_invalid_config_rejected(tmp_path, text):
@@ -72,7 +75,7 @@ def test_merge_dedupes_in_order():
 def offline(monkeypatch, fake_yf, fake_finviz, tmp_path):
     monkeypatch.setattr(cli, "CachedProvider", lambda p: p)
     monkeypatch.setattr(cli, "console", Console(width=200))
-    monkeypatch.setattr(cli.finviz, "screener_tickers", lambda url: ["SCRN", "HZO"])
+    monkeypatch.setattr(cli.finviz, "screener_tickers", lambda url, limit=None: ["SCRN", "HZO"])
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
     monkeypatch.setattr(history, "HISTORY_PATH", tmp_path / "history.csv")
     return tmp_path
@@ -161,3 +164,8 @@ def test_analyze_saves_history(offline):
     runner.invoke(cli.app, ["analyze", "HZO", "NOPE"])  # NOPE: data error, not saved
     rows = history.read(offline / "history.csv")
     assert [r["ticker"] for r in rows] == ["HZO", "HZO"] and rows[0]["price"] > 0
+
+
+def test_analyze_ticker_limit(offline):
+    result = runner.invoke(cli.app, ["analyze", "AAA", "BBB", "CCC", "--max-tickers", "2"])
+    assert result.exit_code == 1 and "max 2" in result.output

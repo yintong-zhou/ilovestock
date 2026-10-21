@@ -11,6 +11,8 @@ import math
 import os
 import secrets
 import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -27,12 +29,41 @@ EDITABLE = {"verdict", *NUMBERS, "shares", "note"}
 MAX_NOTE = 1000
 # Excel reads UTF-8 only with a BOM; utf-8-sig also reads files without one.
 ENCODING = "utf-8-sig"
-# ponytail: one lock per process; a CLI run writing during a web edit could interleave.
-_lock = threading.Lock()
+_lock = threading.Lock()  # threads of one process (web routes run in a thread pool)
+LOCK_TIMEOUT = 10  # seconds to wait for another process (CLI run, web app)
+STALE_LOCK = 60  # a lock file older than this was left by a crashed process
 
 
 class HistoryError(ValueError):
     pass
+
+
+@contextmanager
+def _locked(path: Path):
+    """Exclusive across threads and processes: CLI and web app share the same CSV."""
+    lock = path.with_name(path.name + ".lock")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + LOCK_TIMEOUT
+    with _lock:
+        while True:
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except FileExistsError:
+                try:
+                    if time.time() - lock.stat().st_mtime > STALE_LOCK:
+                        lock.unlink(missing_ok=True)
+                        continue
+                except FileNotFoundError:
+                    continue
+                if time.monotonic() > deadline:
+                    raise HistoryError("history is busy (another ilovestock run): retry") from None
+                time.sleep(0.05)
+        try:
+            yield
+        finally:
+            os.close(fd)
+            lock.unlink(missing_ok=True)
 
 
 def _row(r: TickerAnalysis, analyzed_at: datetime) -> dict:
@@ -78,8 +109,7 @@ def append(results: list[TickerAnalysis], analyzed_at: datetime, path: Path | No
     """Add one row per analyzed ticker. Data errors are skipped: nothing to compare."""
     path = path or HISTORY_PATH
     rows = [_to_csv(_row(r, analyzed_at)) for r in results if not r.error]
-    with _lock:
-        path.parent.mkdir(parents=True, exist_ok=True)
+    with _locked(path):
         new = not path.exists()
         with path.open("a", newline="", encoding=ENCODING if new else "utf-8") as f:
             w = csv.DictWriter(f, FIELDS)
@@ -89,13 +119,18 @@ def append(results: list[TickerAnalysis], analyzed_at: datetime, path: Path | No
     return len(rows)
 
 
-def read(path: Path | None = None) -> list[dict]:
-    """All rows, oldest first."""
-    path = path or HISTORY_PATH
+def _read(path: Path) -> list[dict]:
     if not path.exists():
         return []
     with path.open(newline="", encoding=ENCODING) as f:
         return [_from_csv(raw) for raw in csv.DictReader(f)]
+
+
+def read(path: Path | None = None) -> list[dict]:
+    """All rows, oldest first. Locked: an append in progress is never read half-written."""
+    path = path or HISTORY_PATH
+    with _locked(path):
+        return _read(path)
 
 
 def _write(rows: list[dict], path: Path) -> None:
@@ -132,8 +167,8 @@ def update(row_id: str, changes: dict, path: Path | None = None) -> dict:
     """Edit one row. Changing analysis data marks it edited; the note is the user's own."""
     path = path or HISTORY_PATH
     clean = _check(changes)
-    with _lock:
-        rows = read(path)
+    with _locked(path):
+        rows = _read(path)
         row = next((r for r in rows if r["id"] == row_id), None)
         if row is None:
             raise KeyError(row_id)
@@ -147,8 +182,8 @@ def update(row_id: str, changes: dict, path: Path | None = None) -> dict:
 def delete(path: Path | None = None, ids: list[str] | None = None, ticker: str | None = None):
     """Delete rows by id, or every row of a ticker."""
     path = path or HISTORY_PATH
-    with _lock:
-        rows = read(path)
+    with _locked(path):
+        rows = _read(path)
         if ids and not set(ids) <= {r["id"] for r in rows}:
             raise KeyError(ids)
         keep = [r for r in rows if r["id"] not in (ids or []) and r["ticker"] != ticker]

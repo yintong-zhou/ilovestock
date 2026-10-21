@@ -34,7 +34,7 @@ KEYS = {
 }
 MARKET_CAP = "Market Cap"  # "1.15B"
 DIVIDEND = "Dividend TTM"  # "1.06 (0.31%)"; "-" when none or missing
-EARNINGS = "Earnings"  # "Nov 02 AMC": no year; may be the last report, not the next
+EARNINGS = "Earnings"  # "Nov 02 AMC": no year; the last report until the next is announced
 
 
 class FinvizError(Exception):
@@ -64,10 +64,7 @@ def _dividend_yield(value: str | None) -> float | None:
 
 
 def _earnings_date(value: str | None, today: date) -> date | None:
-    """'Nov 02 AMC' -> the occurrence nearest to today, in any year.
-
-    Already past means it is the last report, not the next one -> None.
-    """
+    """'Nov 02 AMC' -> the occurrence nearest to today, in any year (past = last report)."""
     m = re.match(r"([A-Z][a-z]{2}) (\d{1,2})", (value or "").strip())
     if not m:
         return None
@@ -77,8 +74,7 @@ def _earnings_date(value: str | None, today: date) -> date | None:
             candidates.append(datetime.strptime(f"{m[1]} {m[2]} {year}", "%b %d %Y").date())
         except ValueError:  # Feb 29 in a non-leap year
             pass
-    d = min(candidates, key=lambda c: abs((c - today).days), default=None)
-    return d if d and d >= today else None
+    return min(candidates, key=lambda c: abs((c - today).days), default=None)
 
 
 def parse_snapshot(data: dict, today: date) -> dict:
@@ -86,7 +82,13 @@ def parse_snapshot(data: dict, today: date) -> dict:
     values = {field: _pct(data.get(key)) for field, key in KEYS.items()}
     values["market_cap"] = _money(data.get(MARKET_CAP))
     values["dividend_yield_pct"] = _dividend_yield(data.get(DIVIDEND))
-    values["next_earnings"] = _earnings_date(data.get(EARNINGS), today)
+    raw = data.get(EARNINGS) or ""
+    d = _earnings_date(raw, today)
+    past = d is not None and d < today
+    values["next_earnings"] = None if past else d
+    values["last_earnings"] = d if past else None
+    # no BMO/AMC: assume after the close, the later (safer) reaction day
+    values["last_earnings_amc"] = ("BMO" not in raw) if past else None
     return values
 
 
@@ -117,7 +119,7 @@ class FinvizProvider:
             fv, note = {}, f"Finviz error: {e}"
         found = {k: v for k, v in fv.items() if v is not None}
         sources.update(dict.fromkeys(found, "Finviz"))
-        return dataclasses.replace(base, **found, sources=sources, note=note)
+        return dataclasses.replace(base, **found, sources=sources, note=note, fetched=self.today)
 
 
 def parse_screener_page(html: str) -> tuple[list[str], int]:

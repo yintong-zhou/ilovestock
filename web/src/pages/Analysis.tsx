@@ -27,7 +27,9 @@ function Detail({ r }: { r: TickerAnalysis }) {
       <div className="mb-6 flex flex-wrap items-baseline gap-4">
         <h3 className="font-heading text-xl font-bold">{r.ticker}</h3>
         <VerdictBadge verdict={r.verdict} />
-        <span className="text-sm text-muted">Data as of {r.data_date ?? 'N/D'}</span>
+        <span className="text-sm text-muted">
+          Prices as of {r.data_date ?? 'N/D'}, fundamentals as of {r.fundamentals_date ?? 'N/D'}
+        </span>
       </div>
       {r.error ? (
         <Message kind="error">Data error: {r.error}</Message>

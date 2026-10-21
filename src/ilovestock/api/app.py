@@ -8,6 +8,7 @@ import dataclasses
 import threading
 from datetime import date, datetime
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -28,16 +29,20 @@ from ilovestock.providers.yahoo import YahooProvider
 
 COOKIE = "ilovestock_session"
 WEB_DIST = Path(__file__).resolve().parents[1] / "static"  # built by `npm run build` in web/
-MAX_TICKERS = 50  # ponytail: synchronous request; move to a background job if lists grow
+MAX_TICKERS = inputs.MAX_TICKERS  # ponytail: synchronous request; background job if lists grow
+MAX_BODY = 64 * 1024  # every request body here is small: tickers, config, a note
+
+
+Pin = Annotated[str, Field(pattern=r"^\d{4,8}$")]  # checked before any PBKDF2 work
 
 
 class PinIn(BaseModel):
-    pin: str
+    pin: Pin
 
 
 class PinChange(BaseModel):
-    current_pin: str
-    new_pin: str
+    current_pin: Pin
+    new_pin: Pin
 
 
 class PinStatus(BaseModel):
@@ -70,6 +75,13 @@ def create_app(
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"]
     )  # blocks DNS-rebinding pages from reaching the local API
+
+    @app.middleware("http")
+    async def small_bodies(request: Request, call_next):
+        # ponytail: trusts Content-Length; browsers and fetch() always send it for these bodies
+        if int(request.headers.get("content-length") or 0) > MAX_BODY:
+            return PlainTextResponse("Request too large", status_code=413)
+        return await call_next(request)
 
     @app.middleware("http")
     async def same_origin(request: Request, call_next):
