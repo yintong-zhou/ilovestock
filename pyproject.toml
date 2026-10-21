@@ -29,6 +29,7 @@ ilovestock = "ilovestock.cli:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = ["slow: hits live services (Yahoo, Finviz); run only on request"]
 
 [tool.ruff]
