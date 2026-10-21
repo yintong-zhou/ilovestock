@@ -159,6 +159,15 @@ def test_serve_asks_pin_in_terminal(monkeypatch, tmp_path):
     assert real(path).verify("4821")
 
 
+def test_free_port_skips_busy():
+    import socket
+
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        taken = busy.getsockname()[1]
+        assert cli.free_port(taken) > taken
+
+
 def test_analyze_saves_history(offline):
     runner.invoke(cli.app, ["analyze", "HZO"])
     runner.invoke(cli.app, ["analyze", "HZO", "NOPE"])  # NOPE: data error, not saved

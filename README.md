@@ -172,7 +172,7 @@ A local web app on the same core, for this computer only.
 
 ```bash
 cd web && npm install && npm run build && cd ..   # once, and after frontend changes
-ilovestock serve                                   # http://127.0.0.1:8000
+ilovestock serve                                   # http://127.0.0.1:3000 (or 3001, 3002… if busy)
 ```
 
 - **PIN.** The first `ilovestock serve` asks you to set a PIN (4 to 8 digits) in the terminal, never in the browser: no other program on this computer can claim the app first. It is stored hashed in `~/.config/ilovestock/web_pin.json`, never in clear. After 5 wrong attempts, the next ones wait 30 seconds. Forgot it? Run `ilovestock pin reset`, then `ilovestock serve` again.
@@ -253,8 +253,8 @@ ruff format --check .
 Frontend (React + Vite + Tailwind, in `web/`):
 
 ```bash
-ilovestock serve          # API on :8000
-cd web && npm run dev     # http://localhost:5173, /api proxied to :8000
+ilovestock serve          # API on :3000
+cd web && npm run dev     # http://localhost:5173, /api proxied to :3000
 npm run lint
 npm run build
 ```

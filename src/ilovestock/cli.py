@@ -1,5 +1,6 @@
 """CLI: thin layer over the core. No business rules here."""
 
+import socket
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -150,8 +151,24 @@ def config_path() -> None:
     console.print(str(cfgmod.CONFIG_PATH))
 
 
+def free_port(start: int = 3000) -> int:
+    """First port from `start` up that 127.0.0.1 can bind."""
+    for port in range(start, 65536):
+        with socket.socket() as s:
+            try:
+                s.bind(("127.0.0.1", port))
+            except OSError:
+                continue
+            return port
+    raise OSError(f"no free port from {start}")
+
+
 @app.command()
-def serve(port: Annotated[int, typer.Option(help="Local port")] = 8000) -> None:
+def serve(
+    port: Annotated[
+        int | None, typer.Option(help="Local port (default: first free from 3000)")
+    ] = None,
+) -> None:
     """Start the local web app on http://127.0.0.1:PORT (this computer only)."""
     import uvicorn
 
@@ -170,6 +187,7 @@ def serve(port: Annotated[int, typer.Option(help="Local port")] = 8000) -> None:
             console.print(f"[red]{e}[/]")
 
     # 127.0.0.1 only: the app has a PIN, not real authentication.
+    port = port or free_port()
     console.print(f"ilovestock web app: http://127.0.0.1:{port}  (Ctrl+C to stop)")
     uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")
 
