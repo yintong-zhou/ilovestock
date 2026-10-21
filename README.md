@@ -26,20 +26,9 @@ ilovestock does that work for you. For each US ticker (NASDAQ, NYSE, AMEX), it:
 3. Builds a trade plan: entry, technical stop, take profit in R multiples, number of shares.
 4. Returns **BUY** only if everything passes. Otherwise it returns **NO-BUY** and lists the criteria that failed or had no data.
 
-Example output (abridged):
+Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 
-```text
-                             ilovestock: verdicts
-┌────────┬─────────┬───────┬──────┬────────┬────────┬─────────────────────────┐
-│ Ticker │ Verdict │ Entry │ Stop │ Target │ Shares │ FAIL / N/D criteria     │
-├────────┼─────────┼───────┼──────┼────────┼────────┼─────────────────────────┤
-│ NIO    │ NO-BUY  │ 3.39  │ 3.36 │ 3.48   │ 589    │ EPS growth QOQ: N/D     │
-│        │         │       │      │        │        │ ROE: FAIL               │
-│        │         │       │      │        │        │ Donchian 10w: FAIL      │
-│        │         │       │      │        │        │ SMA 200d: FAIL          │
-└────────┴─────────┴───────┴──────┴────────┴────────┴─────────────────────────┘
-Educational screening tool, not financial advice. Recheck entry and stop on the live price.
-```
+![ilovestock analyze AAPL --detail: NO-BUY verdict with per-criterion detail and trade plan](docs/img/analyze-aapl.svg)
 
 ### Features
 
