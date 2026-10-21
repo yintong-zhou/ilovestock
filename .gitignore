@@ -18,4 +18,8 @@ __pycache__/
 
 # Frontend
 web/node_modules/
-web/dist/
+src/ilovestock/static/
+
+# Python build output
+build/
+dist/

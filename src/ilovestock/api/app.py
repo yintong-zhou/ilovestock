@@ -27,7 +27,7 @@ from ilovestock.providers.yahoo import YahooProvider
 
 COOKIE = "ilovestock_session"
 DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]  # Vite dev server
-WEB_DIST = Path(__file__).resolve().parents[3] / "web" / "dist"
+WEB_DIST = Path(__file__).resolve().parents[1] / "static"  # built by `npm run build` in web/
 MAX_TICKERS = 50  # ponytail: synchronous request; move to a background job if lists grow
 
 
