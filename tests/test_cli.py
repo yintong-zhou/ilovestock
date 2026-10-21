@@ -30,6 +30,9 @@ def test_precedence_default_file_cli(tmp_path):
         '[portfolio]\ncapital = "a lot"\n',
         "[plan]\nentry_mode = 'yolo'\n",
         "not toml ===",
+        "[portfolio]\ncapital = nan\n",
+        "[plan]\nr_multiple = inf\n",
+        "[market_cap]\nsmall_max = 100\n",  # bands must increase: micro 300 > small 100
     ],
 )
 def test_invalid_config_rejected(tmp_path, text):
@@ -136,3 +139,17 @@ def test_analyze_exports_three_files(offline):
 def test_analyze_rejects_unknown_export_format(offline):
     result = runner.invoke(cli.app, ["analyze", "HZO", "--export", "pdf"])
     assert result.exit_code == 1 and "export format" in result.output
+
+
+def test_serve_asks_pin_in_terminal(monkeypatch, tmp_path):
+    import uvicorn
+
+    from ilovestock.api import pin as pinmod
+
+    path, real = tmp_path / "pin.json", pinmod.PinStore
+    monkeypatch.setattr(pinmod, "PinStore", lambda: real(path))
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    result = runner.invoke(cli.app, ["serve"], input="12\n12\n4821\n4821\n")
+    assert result.exit_code == 0, result.output
+    assert "4 to 8 digits" in result.output  # "12" refused, asked again
+    assert real(path).verify("4821")

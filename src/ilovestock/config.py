@@ -1,6 +1,7 @@
 """Config: course defaults < TOML file < CLI options."""
 
 import dataclasses
+import math
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,7 +65,10 @@ class Config:
     def __post_init__(self):
         for f in dataclasses.fields(self):
             v = getattr(self, f.name)
-            ok = isinstance(v, str) if f.type is str else type(v) in (int, float)
+            if f.type is str:
+                ok = isinstance(v, str)
+            else:  # NaN/inf would slip past every range check below
+                ok = type(v) in (int, float) and math.isfinite(v)
             if not ok:
                 raise ConfigError(f"{f.name}: invalid value {v!r}")
         if self.capital <= 0:
@@ -81,6 +85,9 @@ class Config:
             raise ConfigError(f"entry_mode must be one of {ENTRY_MODES}")
         if self.growth_basis not in GROWTH_BASES:
             raise ConfigError(f"growth_basis must be one of {GROWTH_BASES}")
+        bands = (self.nano_max, self.micro_max, self.small_max, self.mid_max, self.large_max)
+        if not 0 < bands[0] < bands[1] < bands[2] < bands[3] < bands[4]:
+            raise ConfigError("market cap bands must be > 0 and increasing (nano < ... < large)")
 
 
 def load(path: Path | None = None, overrides: dict | None = None) -> Config:

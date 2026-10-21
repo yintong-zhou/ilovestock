@@ -5,9 +5,9 @@ import pandas as pd
 import pytest
 
 from ilovestock.providers import finviz
-from ilovestock.providers.cache import CachedProvider
+from ilovestock.providers.cache import CachedProvider, session_tag
 from ilovestock.providers.yahoo import YahooProvider, drop_partial_bar
-from tests.conftest import FIX
+from tests.conftest import FIX, FakeTicker, raw_history
 
 
 def test_yahoo_history_shape(fake_yf):
@@ -102,6 +102,8 @@ def test_finviz_value_parsers():
         ("Nov 02 AMC", date(2026, 10, 20), date(2026, 11, 2)),
         ("Jul 23 BMO", date(2026, 10, 20), None),  # already reported: not the next one
         ("Jan 25 AMC", date(2026, 12, 20), date(2027, 1, 25)),  # year rollover
+        ("Dec 20 AMC", date(2026, 1, 5), None),  # last report seen in January: not next December
+        ("Feb 29 BMO", date(2027, 2, 1), date(2028, 2, 29)),  # leap day, no crash
         ("-", date(2026, 10, 20), None),
     ],
 )
@@ -189,3 +191,36 @@ def test_finviz_live_contract():
     """Detects Finviz page-structure changes. Hits the live site: run only on request."""
     assert finviz.parse_snapshot(finviz.finviz.get_stock("AAPL"), date.today())["inst_own_pct"]
     assert len(finviz.screener_tickers("https://finviz.com/screener.ashx?v=111&f=idx_dji")) == 30
+
+
+def test_yahoo_rejects_non_usd(monkeypatch):
+    class Euro(FakeTicker):
+        history_metadata = {"currency": "EUR"}
+
+    monkeypatch.setattr("ilovestock.providers.yahoo.yf.Ticker", Euro)
+    with pytest.raises(Exception, match="EUR, not USD"):
+        YahooProvider().history("HZO")
+
+
+def test_yahoo_drops_incomplete_rows(monkeypatch):
+    class Gap(FakeTicker):
+        def history(self, **_):
+            df = raw_history(self.ticker)
+            df.iloc[-1, df.columns.get_loc("Close")] = float("nan")
+            return df
+
+    monkeypatch.setattr("ilovestock.providers.yahoo.yf.Ticker", Gap)
+    full = len(raw_history("HZO"))
+    df = YahooProvider().history("HZO")
+    assert len(df) <= full - 1 and not df["Close"].isna().any()
+
+
+@pytest.mark.parametrize(
+    "now,tag",
+    [
+        ("2026-10-20 10:00", "2026-10-20-open"),  # intraday: no bar for today yet
+        ("2026-10-20 16:30", "2026-10-20"),  # after the close: a new file, today's bar included
+    ],
+)
+def test_cache_session_tag(now, tag):
+    assert session_tag(pd.Timestamp(now, tz="America/New_York")) == tag

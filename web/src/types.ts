@@ -1,7 +1,7 @@
 // Mirrors the API's Pydantic/dataclass models (src/ilovestock/api/app.py, models.py).
 
 export type Status = 'PASS' | 'FAIL' | 'N/D'
-export type Verdict = 'BUY' | 'NO-BUY'
+export type Verdict = 'BUY' | 'BUY*' | 'NO-BUY'
 
 export interface CriterionResult {
   name: string

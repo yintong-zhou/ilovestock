@@ -20,11 +20,12 @@ export default function Dashboard({ run }: { run: AnalyzeOut | null }) {
   }
 
   const results = run.results
-  const buys = results.filter((r) => r.verdict === 'BUY')
+  const count = (v: string) => results.filter((r) => r.verdict === v).length
   const errors = results.filter((r) => r.error).length
   // How often each criterion blocked a BUY: the method's bottlenecks in this list.
   const blocking = new Map<string, number>()
   for (const r of results) {
+    if (r.verdict !== 'NO-BUY') continue // BUY* reasons are allowed N/D, not blockers
     for (const reason of r.reasons) {
       const name = reason.split(':')[0]
       blocking.set(name, (blocking.get(name) ?? 0) + 1)
@@ -33,8 +34,9 @@ export default function Dashboard({ run }: { run: AnalyzeOut | null }) {
   const ranked = [...blocking.entries()].sort((a, b) => b[1] - a[1])
   const stats: [string, number, string][] = [
     ['Tickers analyzed', results.length, 'text-text'],
-    ['BUY', buys.length, 'text-pass'],
-    ['NO-BUY', results.length - buys.length, 'text-text'],
+    ['BUY', count('BUY'), 'text-pass'],
+    ['BUY* (incomplete)', count('BUY*'), 'text-nd'],
+    ['NO-BUY', count('NO-BUY'), 'text-text'],
     ['Data errors', errors, errors ? 'text-fail' : 'text-text'],
   ]
 
@@ -45,9 +47,9 @@ export default function Dashboard({ run }: { run: AnalyzeOut | null }) {
         replaces them.
       </PageHeader>
 
-      <dl className="mb-6 grid grid-cols-2 overflow-hidden rounded-md border border-line bg-panel lg:grid-cols-4">
+      <dl className="mb-6 grid grid-cols-2 overflow-hidden rounded-md border border-line bg-panel lg:grid-cols-5">
         {stats.map(([label, value, color]) => (
-          <div key={label} className="border-line p-6 not-last:border-r max-lg:nth-2:border-r-0 max-lg:nth-[-n+2]:border-b">
+          <div key={label} className="border-line p-6 not-last:border-r max-lg:even:border-r-0 max-lg:nth-[-n+4]:border-b">
             <dt className="text-sm text-muted">{label}</dt>
             <dd className={`mt-2 text-4xl font-semibold ${color}`}>{value}</dd>
           </div>

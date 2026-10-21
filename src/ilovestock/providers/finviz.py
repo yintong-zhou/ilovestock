@@ -64,14 +64,21 @@ def _dividend_yield(value: str | None) -> float | None:
 
 
 def _earnings_date(value: str | None, today: date) -> date | None:
-    """'Nov 02 AMC' -> next occurrence. A date already past is the last report -> None."""
+    """'Nov 02 AMC' -> the occurrence nearest to today, in any year.
+
+    Already past means it is the last report, not the next one -> None.
+    """
     m = re.match(r"([A-Z][a-z]{2}) (\d{1,2})", (value or "").strip())
     if not m:
         return None
-    d = datetime.strptime(f"{m.group(1)} {m.group(2)} {today.year}", "%b %d %Y").date()
-    if (today - d).days > 180:  # e.g. "Jan 25" seen in December
-        d = d.replace(year=today.year + 1)
-    return d if d >= today else None
+    candidates = []
+    for year in (today.year - 1, today.year, today.year + 1):
+        try:
+            candidates.append(datetime.strptime(f"{m[1]} {m[2]} {year}", "%b %d %Y").date())
+        except ValueError:  # Feb 29 in a non-leap year
+            pass
+    d = min(candidates, key=lambda c: abs((c - today).days), default=None)
+    return d if d and d >= today else None
 
 
 def parse_snapshot(data: dict, today: date) -> dict:

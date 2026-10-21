@@ -36,7 +36,9 @@ function Detail({ r }: { r: TickerAnalysis }) {
           <div className="flex min-w-0 flex-col gap-8">
             {r.reasons.length > 0 && (
               <div>
-                <h3 className="mb-2 font-semibold text-muted">Why not BUY</h3>
+                <h3 className="mb-2 font-semibold text-muted">
+                  {r.verdict === 'BUY*' ? 'BUY* (incomplete data): N/D allowed' : 'Why not BUY'}
+                </h3>
                 <ul className="list-disc space-y-1 pl-5">
                   {r.reasons.map((reason) => (
                     <li key={reason}>{reason}</li>
@@ -112,7 +114,7 @@ export default function Analysis({
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="size-4 accent-teal" checked={allowMissing}
               onChange={(e) => setAllowMissing(e.target.checked)} />
-            Missing fundamental data (N/D) does not block a BUY
+            Missing fundamental data (N/D) does not block: verdict BUY* (incomplete data)
           </label>
         </form>
         {busy && <Message kind="info">Downloading data takes a few seconds per ticker.</Message>}

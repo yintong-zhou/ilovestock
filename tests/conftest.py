@@ -25,6 +25,8 @@ class FakeTicker:
     def history(self, **_):
         return raw_history(self.ticker)
 
+    history_metadata = {"currency": "USD"}
+
     @property
     def quarterly_income_stmt(self):
         df = pd.read_csv(FIX / f"{self.ticker}_income.csv", index_col=0)

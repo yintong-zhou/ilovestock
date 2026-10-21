@@ -56,7 +56,7 @@ def analyze(
     growth_basis: Annotated[GrowthBasis | None, typer.Option(help="Growth basis")] = None,
     entry_mode: Annotated[EntryMode | None, typer.Option(help="Entry point")] = None,
     allow_missing: Annotated[
-        bool, typer.Option(help="N/D fundamental data does not block BUY (still shown as N/D)")
+        bool, typer.Option(help="N/D fundamentals do not block: verdict BUY* (incomplete data)")
     ] = False,
     detail: Annotated[bool, typer.Option(help="Per-criterion detail")] = False,
     export_formats: Annotated[
@@ -148,6 +148,18 @@ def serve(port: Annotated[int, typer.Option(help="Local port")] = 8000) -> None:
     import uvicorn
 
     from ilovestock.api.app import create_app
+    from ilovestock.api.pin import PinError, PinStore
+
+    # The PIN is set here, never over HTTP: no other local process can claim the app first.
+    store = PinStore()
+    while not store.configured():
+        pin = typer.prompt(
+            "Set the web app PIN (4 to 8 digits)", hide_input=True, confirmation_prompt=True
+        )
+        try:
+            store.set(pin)
+        except PinError as e:
+            console.print(f"[red]{e}[/]")
 
     # 127.0.0.1 only: the app has a PIN, not real authentication.
     console.print(f"ilovestock web app: http://127.0.0.1:{port}  (Ctrl+C to stop)")
@@ -158,7 +170,7 @@ def serve(port: Annotated[int, typer.Option(help="Local port")] = 8000) -> None:
 def pin_reset(
     yes: Annotated[bool, typer.Option("--yes", help="Skip the confirmation")] = False,
 ) -> None:
-    """Delete the web PIN: the next visit asks to set a new one."""
+    """Delete the web PIN: `ilovestock serve` asks for a new one at the next start."""
     from ilovestock.api.pin import PinStore
 
     store = PinStore()
@@ -168,4 +180,4 @@ def pin_reset(
     if not yes and not typer.confirm("Delete the web app PIN?"):
         raise typer.Exit(1)
     store.reset()
-    console.print("PIN deleted. Restart `ilovestock serve` to close open sessions.")
+    console.print("PIN deleted. Restart `ilovestock serve` to set a new one.")

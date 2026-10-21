@@ -17,11 +17,14 @@ def client(tmp_path, fake_yf, fake_finviz):
         provider=FinvizProvider(YahooProvider()),
         static_dir=tmp_path / "no-dist",
     )
-    return TestClient(app, base_url="http://127.0.0.1")
+    c = TestClient(app, base_url="http://127.0.0.1")
+    c.pin_path = tmp_path / "pin.json"
+    return c
 
 
 def unlocked(client):
-    assert client.post("/api/pin/setup", json={"pin": "1234"}).status_code == 204
+    pinmod.PinStore(client.pin_path).set("1234")  # what `ilovestock serve` does in the terminal
+    assert client.post("/api/pin/unlock", json={"pin": "1234"}).status_code == 204
     return client
 
 
@@ -30,15 +33,26 @@ def test_first_visit_asks_for_pin(client):
     assert client.get("/api/config").status_code == 401  # nothing open before the PIN
 
 
-def test_setup_unlocks_and_cannot_be_repeated(client):
+def test_pin_cannot_be_set_over_http(client):
+    assert client.post("/api/pin/setup", json={"pin": "1234"}).status_code in (404, 405)
+    assert client.post("/api/pin/unlock", json={"pin": "1234"}).status_code == 401
     unlocked(client)
     assert client.get("/api/pin/status").json() == {"configured": True, "unlocked": True}
-    assert client.post("/api/pin/setup", json={"pin": "9999"}).status_code == 409
 
 
 @pytest.mark.parametrize("pin", ["123", "123456789", "12a4", ""])
-def test_pin_format(client, pin):
-    assert client.post("/api/pin/setup", json={"pin": pin}).status_code == 422
+def test_pin_format(tmp_path, pin):
+    with pytest.raises(pinmod.PinError):
+        pinmod.PinStore(tmp_path / "pin.json").set(pin)
+
+
+def test_cross_origin_refused(client):
+    unlocked(client)
+    evil = {"Origin": "http://localhost:5173"}  # another local page, same site for the cookie
+    assert client.get("/api/config", headers=evil).status_code == 403
+    own = {"Origin": "http://127.0.0.1"}
+    assert client.get("/api/config", headers=own).status_code == 200
+    assert "access-control-allow-origin" not in client.get("/api/config", headers=evil).headers
 
 
 def test_pin_never_stored_in_clear(client, tmp_path):

@@ -20,7 +20,7 @@ def _num(v) -> float | None:
         f = float(v)
     except (TypeError, ValueError):
         return None
-    return None if math.isnan(f) else f
+    return f if math.isfinite(f) else None
 
 
 def _row(stmt: pd.DataFrame, *names: str) -> list[float | None]:
@@ -44,9 +44,15 @@ def drop_partial_bar(df: pd.DataFrame, now: pd.Timestamp) -> pd.DataFrame:
 
 class YahooProvider:
     def history(self, ticker: str) -> pd.DataFrame:
-        df = yf.Ticker(ticker).history(period=HISTORY_PERIOD, auto_adjust=True)
+        t = yf.Ticker(ticker)
+        df = t.history(period=HISTORY_PERIOD, auto_adjust=True)
         if df.empty:
             raise DataError(f"{ticker}: no prices from Yahoo")
+        # thresholds and the S&P 500 benchmark are in USD: other currencies would mix units
+        currency = (t.history_metadata or {}).get("currency")
+        if currency != "USD":
+            raise DataError(f"{ticker}: quoted in {currency or 'unknown currency'}, not USD")
+        df = df.dropna(subset=["Open", "High", "Low", "Close"])  # incomplete rows = missing data
         df.index = pd.DatetimeIndex(df.index).tz_localize(None).normalize()
         df = drop_partial_bar(df, pd.Timestamp.now(tz=MARKET_TZ))
         if df.empty:

@@ -1,6 +1,7 @@
 """Local web API: thin layer over the core, plus the PIN gate. Serves the built frontend.
 
 Listens on 127.0.0.1 only (see cli.serve). Every /api route except the PIN ones needs a session.
+The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 """
 
 import dataclasses
@@ -8,7 +9,6 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -26,7 +26,6 @@ from ilovestock.providers.cache import CachedProvider
 from ilovestock.providers.yahoo import YahooProvider
 
 COOKIE = "ilovestock_session"
-DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]  # Vite dev server
 WEB_DIST = Path(__file__).resolve().parents[1] / "static"  # built by `npm run build` in web/
 MAX_TICKERS = 50  # ponytail: synchronous request; move to a background job if lists grow
 
@@ -69,10 +68,15 @@ def create_app(
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"]
     )  # blocks DNS-rebinding pages from reaching the local API
-    app.add_middleware(
-        CORSMiddleware, allow_origins=DEV_ORIGINS, allow_credentials=True, allow_methods=["*"],
-        allow_headers=["*"],
-    )  # fmt: skip
+
+    @app.middleware("http")
+    async def same_origin(request: Request, call_next):
+        # No CORS: only this app's own page may call the API. Other local pages (any port is
+        # "same site" for the cookie) are refused. The Vite dev proxy keeps the origin equal.
+        origin = request.headers.get("origin")
+        if origin and origin != f"{request.url.scheme}://{request.headers.get('host')}":
+            return PlainTextResponse("Cross-origin request refused", status_code=403)
+        return await call_next(request)
 
     pins = PinStore(pin_path) if pin_path else PinStore()
     sessions, throttle = Sessions(), Throttle()
@@ -99,16 +103,6 @@ def create_app(
         return PinStatus(
             configured=pins.configured(), unlocked=sessions.valid(request.cookies.get(COOKIE))
         )
-
-    @app.post("/api/pin/setup", status_code=204)
-    def pin_setup(body: PinIn, response: Response) -> None:
-        if pins.configured():
-            raise HTTPException(409, "PIN already set")
-        try:
-            pins.set(body.pin)
-        except PinError as e:
-            raise HTTPException(422, str(e)) from e
-        login(response)
 
     @app.post("/api/pin/unlock", status_code=204)
     def pin_unlock(body: PinIn, response: Response) -> None:

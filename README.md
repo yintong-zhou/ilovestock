@@ -24,7 +24,7 @@ ilovestock does that work for you. For each US ticker (NASDAQ, NYSE, AMEX), it:
 1. Downloads prices and financials, with a daily disk cache.
 2. Checks each fundamental, earnings and technical criterion against fixed thresholds.
 3. Builds a trade plan: entry, technical stop, take profit in R multiples, number of shares.
-4. Returns **BUY** only if everything passes. Otherwise it returns **NO-BUY** and lists the criteria that failed or had no data.
+4. Returns **BUY** only if everything passes. Otherwise it returns **NO-BUY** and lists the criteria that failed or had no data. Prices quoted in a currency other than USD are rejected.
 
 Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 
@@ -103,7 +103,7 @@ A watchlist is a text or CSV file with one ticker per line. Lines starting with 
 | `--r-multiple N` | Take profit as a multiple of R (below 2, the trade is discarded) |
 | `--growth-basis yoy\|qoq` | Growth vs the same quarter last year (Finviz, default), or vs the previous quarter (Yahoo) |
 | `--entry-mode breakout\|pullback\|restart` | Entry point used for the trade plan |
-| `--allow-missing` | `N/D` fundamental criteria don't block a BUY (they still show as `N/D`) |
+| `--allow-missing` | `N/D` fundamental criteria don't block: the verdict is **BUY\*** (incomplete data) instead of BUY, with the `N/D` criteria listed |
 | `--detail` | Per-criterion panel for each ticker |
 | `--export md,csv,json` | Write report files (any combination of the three formats) |
 | `--out-dir DIR` | Report directory (default `reports`) |
@@ -168,7 +168,7 @@ cd web && npm install && npm run build && cd ..   # once, and after frontend cha
 ilovestock serve                                   # http://127.0.0.1:8000
 ```
 
-- **PIN.** On the first visit the app asks you to set a PIN (4 to 8 digits). It is stored hashed in `~/.config/ilovestock/web_pin.json`, never in clear. After 5 wrong attempts, the next ones wait 30 seconds. Forgot it? Run `ilovestock pin reset`.
+- **PIN.** The first `ilovestock serve` asks you to set a PIN (4 to 8 digits) in the terminal, never in the browser: no other program on this computer can claim the app first. It is stored hashed in `~/.config/ilovestock/web_pin.json`, never in clear. After 5 wrong attempts, the next ones wait 30 seconds. Forgot it? Run `ilovestock pin reset`, then `ilovestock serve` again.
 - **Pages.** Dashboard (statistics of the latest analysis in this session), Portfolio (planned for phase 2), Analysis (same rules and trade plan as the CLI), Settings (PIN and the same config file as the CLI).
 
 > [!IMPORTANT]
@@ -176,7 +176,7 @@ ilovestock serve                                   # http://127.0.0.1:8000
 
 ## How the verdict works
 
-**BUY** requires all of the following. Anything else is **NO-BUY**, with the reasons listed.
+**BUY** requires all of the following. Anything else is **NO-BUY**, with the reasons listed. The only exception is `--allow-missing`: if every criterion with data passes and some fundamentals are `N/D`, the verdict is **BUY\*** (incomplete data), never a plain BUY.
 
 ### Fundamental
 

@@ -29,7 +29,6 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   pinStatus: () => request<PinStatus>('GET', '/api/pin/status'),
-  setupPin: (pin: string) => request<void>('POST', '/api/pin/setup', { pin }),
   unlock: (pin: string) => request<void>('POST', '/api/pin/unlock', { pin }),
   lock: () => request<void>('POST', '/api/pin/lock'),
   changePin: (current_pin: string, new_pin: string) =>

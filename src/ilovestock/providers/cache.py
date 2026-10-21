@@ -9,8 +9,15 @@ import pandas as pd
 
 from ilovestock.models import Fundamentals
 from ilovestock.providers.base import MarketDataProvider
+from ilovestock.providers.yahoo import MARKET_CLOSE_HOUR, MARKET_TZ
 
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "ilovestock"
+
+
+def session_tag(now: pd.Timestamp) -> str:
+    """New York date, with '-open' before the close: prices cached intraday lack today's bar,
+    so they are refetched once the session closes."""
+    return f"{now:%Y-%m-%d}" + ("-open" if now.hour < MARKET_CLOSE_HOUR else "")
 
 
 class CachedProvider:
@@ -23,12 +30,12 @@ class CachedProvider:
         self.inner = inner
         self.dir = cache_dir
 
-    def _path(self, ticker: str, kind: str, ext: str) -> Path:
+    def _path(self, ticker: str, kind: str, ext: str, tag: str | None = None) -> Path:
         self.dir.mkdir(parents=True, exist_ok=True)
-        return self.dir / f"{date.today():%Y-%m-%d}_{ticker}_{kind}.{ext}"
+        return self.dir / f"{tag or f'{date.today():%Y-%m-%d}'}_{ticker}_{kind}.{ext}"
 
     def history(self, ticker: str) -> pd.DataFrame:
-        path = self._path(ticker, "history", "csv")
+        path = self._path(ticker, "history", "csv", session_tag(pd.Timestamp.now(tz=MARKET_TZ)))
         if path.exists():
             return pd.read_csv(path, index_col=0, parse_dates=True)
         df = self.inner.history(ticker)

@@ -1,5 +1,6 @@
 """Data models shared by core, CLI and (later) the web API."""
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
@@ -15,6 +16,7 @@ class Status(StrEnum):
 
 class Verdict(StrEnum):
     BUY = "BUY"
+    BUY_INCOMPLETE = "BUY*"  # --allow-missing: everything with data passed, some fundamentals N/D
     NO_BUY = "NO-BUY"
 
 
@@ -30,6 +32,9 @@ class CriterionResult:
         # numpy scalars (from pandas) -> plain float, so JSON/API serialization stays clean
         if self.value is not None and not isinstance(self.value, str):
             self.value = float(self.value)
+            if not math.isfinite(self.value):  # NaN/inf is missing data: N/D, never PASS/FAIL
+                self.value, self.status = None, Status.ND
+                self.note = "; ".join(x for x in (self.note, "non-finite value") if x)
 
 
 @dataclass

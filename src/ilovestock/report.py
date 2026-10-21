@@ -21,13 +21,20 @@ def _fmt(v: float | None) -> str:
     return "N/D" if v is None else f"{v:,.2f}"
 
 
+VERDICT_STYLE = {
+    Verdict.BUY: "bold green",
+    Verdict.BUY_INCOMPLETE: "bold yellow",
+    Verdict.NO_BUY: "red",
+}
+
+
 def summary(results: list[TickerAnalysis]) -> Table:
     t = Table(title="ilovestock: verdicts")
     for col in ("Ticker", "Verdict", "Entry", "Stop", "Target", "Shares", "FAIL / N/D criteria"):
         t.add_column(col)
     for r in results:
         p = r.plan
-        style = "bold green" if r.verdict == Verdict.BUY else "red"
+        style = VERDICT_STYLE[r.verdict]
         t.add_row(
             r.ticker,
             f"[{style}]{r.verdict}[/]",
@@ -79,7 +86,7 @@ def detail(r: TickerAnalysis) -> Panel:
         if r.plan.discarded:
             lines[-1] = f"[red]{lines[-1]}[/]"
         parts.append(Panel("\n".join(lines), title="Trade plan"))
-    style = "green" if r.verdict == Verdict.BUY else "red"
+    style = VERDICT_STYLE[r.verdict]
     return Panel(
         Group(*parts),
         title=f"{r.ticker}: {r.verdict}  (data as of {r.data_date})",

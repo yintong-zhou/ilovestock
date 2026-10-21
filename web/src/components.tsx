@@ -79,7 +79,7 @@ export function StatusText({ status }: { status: Status }) {
 }
 
 export function VerdictBadge({ verdict }: { verdict: Verdict }) {
-  const style = verdict === 'BUY' ? 'bg-green text-canvas' : 'bg-line text-muted'
+  const style = { BUY: 'bg-green text-canvas', 'BUY*': 'bg-nd text-canvas', 'NO-BUY': 'bg-line text-muted' }[verdict]
   return (
     <span className={`inline-block rounded-sm px-2 py-0.5 text-sm font-semibold whitespace-nowrap ${style}`}>
       {verdict}

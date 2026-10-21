@@ -202,10 +202,21 @@ def test_verdict_invalid_plan_blocks(plan):
 
 
 def test_allow_missing_skips_fundamental_nd_only():
+    assert verdict(FUND, TECH, EARN, PLAN, allow_missing=True) == (Verdict.BUY, [])
     fund = [*FUND]
     fund[3] = CriterionResult("inst", Status.ND, None, "")
-    assert verdict(fund, TECH, EARN, PLAN, allow_missing=True)[0] == Verdict.BUY
+    # never a plain BUY with missing data: BUY* lists what was skipped
+    assert verdict(fund, TECH, EARN, PLAN, allow_missing=True) == (
+        Verdict.BUY_INCOMPLETE,
+        ["inst: N/D"],
+    )
     fund[2] = CriterionResult("roe", Status.FAIL, 1, "")
     assert verdict(fund, TECH, EARN, PLAN, allow_missing=True)[0] == Verdict.NO_BUY
     earn = CriterionResult("earnings", Status.ND, None, "")
     assert verdict(FUND, TECH, earn, PLAN, allow_missing=True)[0] == Verdict.NO_BUY
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_non_finite_value_is_nd(value):
+    c = CriterionResult("SMA 200d", Status.PASS, value, "> 10", "x")
+    assert (c.status, c.value, c.note) == (Status.ND, None, "x; non-finite value")
