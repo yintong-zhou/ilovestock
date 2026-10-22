@@ -42,6 +42,12 @@ class FinvizError(Exception):
     pass
 
 
+class TooManyResults(FinvizError):
+    def __init__(self, message: str, total: int):
+        super().__init__(message)
+        self.total = total
+
+
 def _pct(value: str | None) -> float | None:
     """'82.64%' -> 82.64; '-' or missing -> None."""
     if not value:
@@ -146,8 +152,8 @@ def screener_tickers(url: str, max_results: int | None = None) -> list[str]:
         resp.raise_for_status()
         page, total = parse_screener_page(resp.text)
         if max_results is not None and total > max_results:
-            raise FinvizError(
-                f"screener has {total} results: max {max_results}, narrow the filters"
+            raise TooManyResults(
+                f"screener has {total} results: max {max_results}, narrow the filters", total
             )
         if not page:
             break

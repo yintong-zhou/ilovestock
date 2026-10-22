@@ -239,8 +239,9 @@ def test_screener_too_large_stops_after_first_page(monkeypatch):
             pass
 
     monkeypatch.setattr(finviz.requests, "get", lambda *a, **k: calls.append(1) or Resp())
-    with pytest.raises(finviz.FinvizError, match="261 results"):
+    with pytest.raises(finviz.TooManyResults, match="261 results") as exc:
         finviz.screener_tickers("https://finviz.com/screener.ashx?v=111", max_results=50)
+    assert exc.value.total == 261
     assert len(calls) == 1
 
 

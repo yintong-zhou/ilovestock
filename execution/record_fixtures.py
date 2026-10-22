@@ -2,6 +2,7 @@
 
 Hits the network: run only on purpose, then commit the files in tests/fixtures/.
 Usage: python execution/record_fixtures.py [TICKER] [FINVIZ_SCREENER_URL]
+       python execution/record_fixtures.py --screen   # first page of `ilovestock screen`'s URL
 """
 
 import json
@@ -37,7 +38,22 @@ def record_finviz(ticker: str, screener_url: str) -> None:
         (OUT / f"finviz_screener_p{i}.html").write_text(resp.text, encoding="utf-8")
 
 
+def record_screen() -> None:
+    """Default-config screener page: its applied-filter list proves Finviz knows each code."""
+    from ilovestock.config import load
+    from ilovestock.screener import screener_url
+
+    url = screener_url(load(Path("does-not-exist.toml")))
+    resp = requests.get(url, params={"r": 1}, headers={"User-Agent": UA}, timeout=30)
+    resp.raise_for_status()
+    (OUT / "finviz_screener_default.html").write_text(resp.text, encoding="utf-8")
+    print(url)
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--screen"]:
+        record_screen()
+        sys.exit()
     ticker = sys.argv[1] if len(sys.argv) > 1 else "HZO"
     url = (
         sys.argv[2]
