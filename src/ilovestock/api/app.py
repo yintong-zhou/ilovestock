@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ilovestock import config as cfgmod
-from ilovestock import history, inputs
+from ilovestock import history, inputs, screener
 from ilovestock.analysis import analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
 from ilovestock.export import SOURCES, data_date
@@ -62,6 +62,20 @@ class AnalyzeOut(BaseModel):
     data_date: str
     finviz_warning: str
     results: list[TickerAnalysis]
+
+
+class ScreenIn(BaseModel):
+    max: int = Field(screener.DEFAULT_RESULTS, ge=1, le=screener.MAX_RESULTS)
+
+
+class ScreenOut(BaseModel):
+    disclaimer: str
+    finviz_warning: str
+    screened_on: str
+    candidates: int
+    passed: int
+    errors: list[str]
+    hits: list[screener.ScreenHit]
 
 
 def create_app(
@@ -188,6 +202,22 @@ def create_app(
             data_date=data_date(results),
             finviz_warning=finviz.WARNING,
             results=results,
+        )
+
+    @app.post("/api/screen", dependencies=[Depends(session)])
+    def screen(body: ScreenIn) -> ScreenOut:
+        today = date.today()
+        try:  # ponytail: synchronous like /api/analyze; MAX_CANDIDATES bounds it to minutes
+            result = screener.screen(provider, cfgmod.load(cfg_path), today, body.max)
+        except (cfgmod.ConfigError, finviz.FinvizError) as e:
+            raise HTTPException(422, str(e)) from e
+        except Exception as e:
+            raise HTTPException(502, f"Finviz screener not available: {e}") from e
+        return ScreenOut(
+            disclaimer=DISCLAIMER,
+            finviz_warning=finviz.WARNING,
+            screened_on=today.isoformat(),
+            **vars(result),
         )
 
     @app.get("/api/history", dependencies=[Depends(session)])
