@@ -61,6 +61,16 @@ class Fundamentals:
 
 
 @dataclass
+class Quality:
+    """Informative: is the growth profitable? Never changes the verdict."""
+
+    roic_pct: float | None
+    margin_pct: float | None  # operating margin, latest quarter
+    margin_year_ago_pct: float | None  # same quarter a year earlier
+    margin_change_pt: float | None  # percentage points
+
+
+@dataclass
 class TradePlan:
     entry: float
     stop: float
