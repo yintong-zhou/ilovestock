@@ -137,3 +137,10 @@ def test_screen_too_many_candidates(monkeypatch):
         screen(FakeProvider({}), CFG, TODAY)
     with pytest.raises(finviz.FinvizError, match="yoy"):
         screen(FakeProvider({}), replace(CFG, growth_basis="qoq"), TODAY)
+
+
+def test_screen_reports_finviz_fetch_failure_as_error(monkeypatch):
+    # e.g. HTTP 429 on the quote page: a fetch failure, not a stock that failed the rules
+    f = good_fundamentals(inst_trans_pct=None, note="Finviz error: 429")
+    r = run(monkeypatch, {"A": f, "B": good_fundamentals()})
+    assert (r.errors, r.passed, [h.ticker for h in r.hits]) == (["A"], 1, ["B"])

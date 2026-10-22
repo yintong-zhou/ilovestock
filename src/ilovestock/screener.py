@@ -97,6 +97,9 @@ def screen(
         except Exception:  # unofficial sources: skip the ticker, keep the search going
             errors.append(t)
             continue
+        if fund.note:  # Finviz quote page failed (e.g. 429): a fetch error, not a failed rule
+            errors.append(t)
+            continue
         if all(c.status == Status.PASS for c in [*fund_results, earn]):
             cap = next((c.value for c in fund_results if c.name == "Market cap"), None)
             passed.append((t, cap, quality(fund)))
