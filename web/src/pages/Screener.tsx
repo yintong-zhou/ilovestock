@@ -1,6 +1,5 @@
 import { type FormEvent, useState } from 'react'
 
-import { api } from '../api'
 import { Button, Field, inputClass, Message, PageHeader, Panel } from '../components'
 import { pct, points } from '../format'
 import type { ScreenHit, ScreenOut } from '../types'
@@ -41,15 +40,16 @@ function downloadWatchlist(out: ScreenOut) {
 
 export default function Screener({
   result,
-  onResult,
+  busy,
+  onSearch,
   onApiError,
 }: {
   result: ScreenOut | null
-  onResult: (out: ScreenOut) => void
+  busy: boolean // owned by App: survives leaving this page mid-search
+  onSearch: (max: number) => Promise<void>
   onApiError: (e: unknown) => void
 }) {
   const [max, setMax] = useState(20)
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const valid = Number.isInteger(max) && max >= 1 && max <= MAX_RESULTS
@@ -57,15 +57,12 @@ export default function Screener({
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError('')
-    setBusy(true)
     try {
-      onResult(await api.screen(max))
+      await onSearch(max)
       setOpen(null)
     } catch (err) {
       setError((err as Error).message)
       onApiError(err)
-    } finally {
-      setBusy(false)
     }
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api, ApiError } from './api'
 import { Message } from './components'
@@ -27,6 +27,21 @@ export default function App() {
   // Latest analysis of this session, shared by Analysis and Dashboard (not stored on disk).
   const [lastRun, setLastRun] = useState<AnalyzeOut | null>(null)
   const [lastScreen, setLastScreen] = useState<ScreenOut | null>(null)
+  // A screen takes minutes, so it runs here, not in the page: leaving the page keeps it busy
+  // (no second search in parallel), and a result landing after Lock belongs to an ended session.
+  const [screening, setScreening] = useState(false)
+  const locks = useRef(0)
+
+  const runScreen = useCallback(async (max: number) => {
+    const session = locks.current
+    setScreening(true)
+    try {
+      const out = await api.screen(max)
+      if (session === locks.current) setLastScreen(out)
+    } finally {
+      if (session === locks.current) setScreening(false)
+    }
+  }, [])
 
   const refresh = useCallback(() => {
     api.pinStatus().then(setStatus, (e: Error) => setError(e.message))
@@ -68,6 +83,8 @@ export default function App() {
     await api.lock()
     setLastRun(null) // locked means nothing stays on screen or in page memory
     setLastScreen(null)
+    locks.current += 1
+    setScreening(false)
     refresh()
   }
 
@@ -78,7 +95,9 @@ export default function App() {
         <div className="max-w-[1200px]">
         {page === 'dashboard' && <Dashboard run={lastRun} />}
         {page === 'portfolio' && <Portfolio />}
-        {page === 'screener' && <Screener result={lastScreen} onResult={setLastScreen} onApiError={onApiError} />}
+        {page === 'screener' && (
+          <Screener result={lastScreen} busy={screening} onSearch={runScreen} onApiError={onApiError} />
+        )}
         {page === 'analysis' && (
           <Analysis initialTickers={arg} run={lastRun} onRun={setLastRun} onApiError={onApiError} />
         )}
