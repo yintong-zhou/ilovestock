@@ -2,13 +2,22 @@
 
 import re
 from dataclasses import replace
+from datetime import date, timedelta
 from pathlib import Path
 
+import pytest
+
 from ilovestock.config import load
-from ilovestock.screener import finviz_filters, screener_url
+from ilovestock.models import Fundamentals
+from ilovestock.providers import finviz
+from ilovestock.providers.base import DataError
+from ilovestock.screener import finviz_filters, screen, screener_url
 from tests.conftest import FIX
+from tests.test_rules import good_fundamentals, prices
 
 DEFAULT = load(Path("does-not-exist.toml"))
+CFG = DEFAULT
+TODAY = date(2026, 10, 22)
 
 
 # --- Finviz pre-filter ---
@@ -58,3 +67,73 @@ def test_finviz_accepts_every_generated_filter():
     html = (FIX / "finviz_screener_default.html").read_text(encoding="utf-8")
     shown = {":".join(code.rsplit("_", 1)) for code in finviz_filters(DEFAULT)}
     assert shown <= applied_filters(html)
+
+
+# --- exact check and ranking ---
+class FakeProvider:
+    def __init__(self, data: dict[str, Fundamentals | Exception]):
+        self.data = data
+
+    def _get(self, t):
+        v = self.data[t]
+        if isinstance(v, Exception):
+            raise v
+        return v
+
+    def history(self, t):
+        self._get(t)
+        return prices()
+
+    def fundamentals(self, t):
+        return self._get(t)
+
+
+def run(monkeypatch, data, **kw):
+    monkeypatch.setattr(finviz, "screener_tickers", lambda url, limit=None: list(data))
+    return screen(FakeProvider(data), kw.pop("cfg", CFG), TODAY, **kw)
+
+
+def test_screen_keeps_only_all_pass_and_counts(monkeypatch):
+    r = run(
+        monkeypatch,
+        {
+            "A": good_fundamentals(roic_pct=20.0),
+            "B": good_fundamentals(roe_pct=10.0),
+            "C": DataError("x"),
+        },
+    )
+    assert (r.candidates, r.passed, r.errors, [h.ticker for h in r.hits]) == (3, 1, ["C"], ["A"])
+    assert r.hits[0].market_cap == "1,000M (small)"
+
+
+def test_screen_nd_never_passes(monkeypatch):
+    assert run(monkeypatch, {"A": good_fundamentals(inst_own_pct=None)}).passed == 0
+
+
+def test_screen_ranks_and_cuts(monkeypatch):
+    # no operating income for anyone: margin N/D, only ROIC decides
+    data = {t: good_fundamentals(roic_pct=v) for t, v in (("A", 30.0), ("B", 10.0), ("C", 20.0))}
+    r = run(monkeypatch, data, max_results=2)
+    assert r.passed == 3 and [h.ticker for h in r.hits] == ["A", "C"]
+    assert (r.hits[0].roic_rank, r.hits[0].margin_rank) == (1, None)
+
+
+def test_screen_max_above_passed_shows_all(monkeypatch):
+    data = {t: good_fundamentals() for t in ("A", "B", "C")}
+    assert len(run(monkeypatch, data, max_results=20).hits) == 3
+
+
+def test_screen_ignores_post_earnings(monkeypatch):
+    f = good_fundamentals(last_earnings=TODAY - timedelta(days=1), last_earnings_amc=True)
+    assert run(monkeypatch, {"A": f}).passed == 1
+
+
+def test_screen_too_many_candidates(monkeypatch):
+    def boom(url, limit=None):
+        raise finviz.TooManyResults("x", total=150)
+
+    monkeypatch.setattr(finviz, "screener_tickers", boom)
+    with pytest.raises(finviz.FinvizError, match="150 candidates from Finviz: max 100"):
+        screen(FakeProvider({}), CFG, TODAY)
+    with pytest.raises(finviz.FinvizError, match="yoy"):
+        screen(FakeProvider({}), replace(CFG, growth_basis="qoq"), TODAY)
