@@ -1,10 +1,12 @@
 """Fundamentals-first screener: Finviz pre-filter, exact check, quality ranking (offline)."""
 
+import re
 from dataclasses import replace
 from pathlib import Path
 
 from ilovestock.config import load
 from ilovestock.screener import finviz_filters, screener_url
+from tests.conftest import FIX
 
 DEFAULT = load(Path("does-not-exist.toml"))
 
@@ -44,3 +46,15 @@ def test_screener_url_has_no_country_filter():
     url = screener_url(DEFAULT)
     assert url.startswith("https://finviz.com/screener.ashx?v=111&f=fa_salesqoq_o20,")
     assert "geo_" not in url
+
+
+def applied_filters(html: str) -> set[str]:
+    m = re.search(r'screener-split-applied-filters"><span> <b>Filters:</b> (.*?)</span>', html)
+    return set(m.group(1).replace("<!-- -->", " ").split())
+
+
+def test_finviz_accepts_every_generated_filter():
+    # Finviz silently ignores unknown codes: a code missing from the applied list is wrong
+    html = (FIX / "finviz_screener_default.html").read_text(encoding="utf-8")
+    shown = {":".join(code.rsplit("_", 1)) for code in finviz_filters(DEFAULT)}
+    assert shown <= applied_filters(html)
