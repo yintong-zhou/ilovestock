@@ -8,6 +8,7 @@ from rich.table import Table
 from ilovestock.models import (
     DISCLAIMER,
     CriterionResult,
+    Quality,
     Status,
     TickerAnalysis,
     TradePlan,
@@ -15,10 +16,17 @@ from ilovestock.models import (
 )
 
 STATUS_STYLE = {Status.PASS: "green", Status.FAIL: "red", Status.ND: "yellow"}
+QUALITY_NOTE = "informative, does not change the verdict"
 
 
 def _fmt(v: float | None) -> str:
     return "N/D" if v is None else f"{v:,.2f}"
+
+
+def quality_text(q: Quality) -> str:
+    roic = "N/D" if q.roic_pct is None else f"{q.roic_pct:.1f}%"
+    chg = "N/D" if q.margin_change_pt is None else f"{q.margin_change_pt:+.1f} pt"
+    return f"ROIC {roic}, op. margin {chg}"
 
 
 VERDICT_STYLE = {
@@ -77,10 +85,10 @@ def plan_lines(p: TradePlan) -> list[str]:
 def detail(r: TickerAnalysis) -> Panel:
     if r.error:
         return Panel(escape(r.error), title=r.ticker, border_style="red")
-    parts: list = [
-        _criteria_table("Fundamental", [*r.fundamental, r.earnings]),
-        _criteria_table("Technical", r.technical),
-    ]
+    fundamental = _criteria_table("Fundamental", [*r.fundamental, r.earnings])
+    if r.quality:  # a shown row only: kept out of the criteria, so the verdict never sees it
+        fundamental.add_row("Quality", quality_text(r.quality), "-", "[cyan]INFO[/]", QUALITY_NOTE)
+    parts: list = [fundamental, _criteria_table("Technical", r.technical)]
     if r.plan:
         lines = [escape(line) for line in plan_lines(r.plan)]
         if r.plan.discarded:

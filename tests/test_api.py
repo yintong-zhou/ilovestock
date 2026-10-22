@@ -127,6 +127,7 @@ def test_analyze(client):
     hzo, wlst = doc["results"]
     assert hzo["ticker"] == "HZO" and hzo["verdict"] == "NO-BUY"
     assert any(c["note"] == "source: Finviz" for c in hzo["fundamental"])
+    assert hzo["quality"]["roic_pct"] == 0.28
     assert hzo["plan"]["shares"] >= 1
     assert wlst["error"]  # no recorded data: reported per ticker
 

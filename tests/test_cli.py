@@ -178,3 +178,10 @@ def test_analyze_saves_history(offline):
 def test_analyze_ticker_limit(offline):
     result = runner.invoke(cli.app, ["analyze", "AAA", "BBB", "CCC", "--max-tickers", "2"])
     assert result.exit_code == 1 and "max 2" in result.output
+
+
+def test_detail_shows_quality_row(offline):
+    result = runner.invoke(cli.app, ["analyze", "HZO", "--detail"])
+    assert result.exit_code == 0, result.output
+    assert "Quality" in result.output and "INFO" in result.output
+    assert "ROIC 0.3%" in result.output

@@ -100,3 +100,4 @@ class TickerAnalysis:
     error: str | None = None
     price: float | None = None  # last close of the analyzed data
     fundamentals_date: date | None = None  # when the fundamentals were fetched
+    quality: Quality | None = None  # informative, outside the criteria and the verdict

@@ -4,6 +4,7 @@ import pytest
 
 from ilovestock.models import Quality
 from ilovestock.quality import margin_change, ranks, scores
+from ilovestock.report import quality_text
 
 
 def q(roic: float | None, chg: float | None) -> Quality:
@@ -39,3 +40,9 @@ def test_scores_scale_and_average():
 def test_scores_none_is_worst_and_single_is_100():
     assert scores([q(None, 1), q(10, None)]) == [50.0, 50.0]
     assert scores([q(5, 1)]) == [100.0]
+
+
+def test_quality_text_signs_and_nd():
+    assert quality_text(Quality(31.2, 18.1, 14.0, 4.1)) == "ROIC 31.2%, op. margin +4.1 pt"
+    assert quality_text(Quality(5.0, 1.0, 1.5, -0.5)) == "ROIC 5.0%, op. margin -0.5 pt"
+    assert quality_text(Quality(None, None, None, None)) == "ROIC N/D, op. margin N/D"
