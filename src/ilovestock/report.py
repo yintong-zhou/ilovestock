@@ -52,7 +52,7 @@ def screen_table(result: ScreenResult) -> Table:
             h.market_cap or "N/D",
             _roic(h.quality),
             _margin_change(h.quality),
-            f"{h.score:.0f}",
+            str(int(h.score + 0.5)),  # half up, like Math.round in the web app
             f"ROIC {_rank(h.roic_rank)}, margin {_rank(h.margin_rank)} of {result.passed}",
         )
     return t

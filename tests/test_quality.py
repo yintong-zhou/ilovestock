@@ -1,10 +1,12 @@
 """Quality score: ROIC and operating margin change, ranked within a group."""
 
 import pytest
+from rich.console import Console
 
 from ilovestock.models import Quality
 from ilovestock.quality import margin_change, ranks, scores
-from ilovestock.report import quality_text
+from ilovestock.report import quality_text, screen_table
+from ilovestock.screener import ScreenHit, ScreenResult
 
 
 def q(roic: float | None, chg: float | None) -> Quality:
@@ -46,3 +48,12 @@ def test_quality_text_signs_and_nd():
     assert quality_text(Quality(31.2, 18.1, 14.0, 4.1)) == "ROIC 31.2%, op. margin +4.1 pt"
     assert quality_text(Quality(5.0, 1.0, 1.5, -0.5)) == "ROIC 5.0%, op. margin -0.5 pt"
     assert quality_text(Quality(None, None, None, None)) == "ROIC N/D, op. margin N/D"
+
+
+def test_screen_table_rounds_half_up_like_the_web():
+    # the web shows Math.round(score); Python's round-half-even would print 12 here
+    hit = ScreenHit("IJKL", "180M (micro)", Quality(None, None, None, None), 12.5, None, None)
+    console = Console(record=True, width=200)
+    console.print(screen_table(ScreenResult(3, 3, [], [hit])))
+    row = next(line for line in console.export_text().splitlines() if "IJKL" in line)
+    assert " 13 " in row and "ROIC N/D, margin N/D of 3" in row

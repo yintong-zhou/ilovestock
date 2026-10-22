@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-import { fmt } from './format'
-import type { CriterionResult, Status, TradePlan, Verdict } from './types'
+import { fmt, qualityText } from './format'
+import type { CriterionResult, Quality, Status, TradePlan, Verdict } from './types'
 
 export function PageHeader({ title, aside, children }: { title: string; aside?: ReactNode; children?: ReactNode }) {
   return (
@@ -120,7 +120,15 @@ export function RuleLegend() {
   )
 }
 
-export function CriteriaTable({ title, items }: { title: string; items: CriterionResult[] }) {
+export function CriteriaTable({
+  title,
+  items,
+  quality,
+}: {
+  title: string
+  items: CriterionResult[]
+  quality?: Quality | null // shown last, outside the criteria: never part of the verdict
+}) {
   return (
     <div>
       <h3 className="mb-2 font-semibold text-muted">{title}</h3>
@@ -154,6 +162,15 @@ export function CriteriaTable({ title, items }: { title: string; items: Criterio
               <td className="py-2 text-muted">{c.note}</td>
             </tr>
           ))}
+          {quality && (
+            <tr className="align-top">
+              <td className="py-2 pr-4">Quality</td>
+              <td className="py-2 pr-4 text-right break-words">{qualityText(quality)}</td>
+              <td className="py-2 pr-4 text-muted">—</td>
+              <td className="py-2 pr-4 font-semibold text-teal-tint">INFO</td>
+              <td className="py-2 text-muted">Informative, does not change the verdict</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

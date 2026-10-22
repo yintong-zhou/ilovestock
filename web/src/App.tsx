@@ -6,12 +6,13 @@ import Analysis from './pages/Analysis'
 import Dashboard from './pages/Dashboard'
 import History from './pages/History'
 import Portfolio from './pages/Portfolio'
+import Screener from './pages/Screener'
 import Settings from './pages/Settings'
 import PinScreen from './PinScreen'
 import Sidebar, { type Page } from './Sidebar'
-import type { AnalyzeOut, PinStatus } from './types'
+import type { AnalyzeOut, PinStatus, ScreenOut } from './types'
 
-const PAGES: Page[] = ['dashboard', 'portfolio', 'analysis', 'history', 'settings']
+const PAGES: Page[] = ['dashboard', 'portfolio', 'screener', 'analysis', 'history', 'settings']
 
 /** '#history/HZO' -> ['history', 'HZO']: page plus an optional argument. */
 function routeFromHash(): [Page, string] {
@@ -25,6 +26,7 @@ export default function App() {
   const [[page, arg], setRoute] = useState(routeFromHash)
   // Latest analysis of this session, shared by Analysis and Dashboard (not stored on disk).
   const [lastRun, setLastRun] = useState<AnalyzeOut | null>(null)
+  const [lastScreen, setLastScreen] = useState<ScreenOut | null>(null)
 
   const refresh = useCallback(() => {
     api.pinStatus().then(setStatus, (e: Error) => setError(e.message))
@@ -65,6 +67,7 @@ export default function App() {
   async function lock() {
     await api.lock()
     setLastRun(null) // locked means nothing stays on screen or in page memory
+    setLastScreen(null)
     refresh()
   }
 
@@ -75,7 +78,10 @@ export default function App() {
         <div className="max-w-[1200px]">
         {page === 'dashboard' && <Dashboard run={lastRun} />}
         {page === 'portfolio' && <Portfolio />}
-        {page === 'analysis' && <Analysis run={lastRun} onRun={setLastRun} onApiError={onApiError} />}
+        {page === 'screener' && <Screener result={lastScreen} onResult={setLastScreen} onApiError={onApiError} />}
+        {page === 'analysis' && (
+          <Analysis initialTickers={arg} run={lastRun} onRun={setLastRun} onApiError={onApiError} />
+        )}
         {page === 'history' && <History ticker={arg} onApiError={onApiError} />}
         {page === 'settings' && <Settings onApiError={onApiError} />}
         </div>

@@ -27,6 +27,14 @@ export interface TradePlan {
   info: string[]
 }
 
+/** Informative: is the growth profitable? Never changes the verdict (models.Quality). */
+export interface Quality {
+  roic_pct: number | null
+  margin_pct: number | null
+  margin_year_ago_pct: number | null
+  margin_change_pt: number | null
+}
+
 export interface TickerAnalysis {
   ticker: string
   verdict: Verdict
@@ -39,6 +47,7 @@ export interface TickerAnalysis {
   error: string | null
   price: number | null
   fundamentals_date: string | null
+  quality: Quality | null
 }
 
 export interface AnalyzeOut {
@@ -47,6 +56,26 @@ export interface AnalyzeOut {
   data_date: string
   finviz_warning: string
   results: TickerAnalysis[]
+}
+
+/** One stock from the screener (src/ilovestock/screener.py). */
+export interface ScreenHit {
+  ticker: string
+  market_cap: string | null
+  quality: Quality
+  score: number
+  roic_rank: number | null
+  margin_rank: number | null
+}
+
+export interface ScreenOut {
+  disclaimer: string
+  finviz_warning: string
+  screened_on: string
+  candidates: number
+  passed: number
+  errors: string[]
+  hits: ScreenHit[]
 }
 
 /** One saved analysis of one ticker (src/ilovestock/history.py). */

@@ -48,7 +48,7 @@ function Detail({ r }: { r: TickerAnalysis }) {
                 </ul>
               </div>
             )}
-            <CriteriaTable title="Fundamental" items={fundamentalRules(r)} />
+            <CriteriaTable title="Fundamental" items={fundamentalRules(r)} quality={r.quality} />
             <CriteriaTable title="Technical" items={r.technical} />
           </div>
           {r.plan && <PlanDetails plan={r.plan} />}
@@ -59,15 +59,17 @@ function Detail({ r }: { r: TickerAnalysis }) {
 }
 
 export default function Analysis({
+  initialTickers,
   run,
   onRun,
   onApiError,
 }: {
+  initialTickers: string // '#analysis/ABCD,EFGH' from the Screener: filled in, not run
   run: AnalyzeOut | null
   onRun: (run: AnalyzeOut) => void
   onApiError: (e: unknown) => void
 }) {
-  const [tickers, setTickers] = useState('')
+  const [tickers, setTickers] = useState(initialTickers.split(',').join(' '))
   const [finvizUrl, setFinvizUrl] = useState('')
   const [allowMissing, setAllowMissing] = useState(false)
   const [busy, setBusy] = useState(false)

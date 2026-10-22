@@ -1,4 +1,4 @@
-import type { AnalyzeOut, AppConfig, HistoryEdit, HistoryRow, PinStatus } from './types'
+import type { AnalyzeOut, AppConfig, HistoryEdit, HistoryRow, PinStatus, ScreenOut } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -37,6 +37,7 @@ export const api = {
   putConfig: (cfg: AppConfig) => request<AppConfig>('PUT', '/api/config', cfg),
   analyze: (tickers: string[], finviz_url: string | null, allow_missing: boolean) =>
     request<AnalyzeOut>('POST', '/api/analyze', { tickers, finviz_url, allow_missing }),
+  screen: (max: number) => request<ScreenOut>('POST', '/api/screen', { max }),
   history: () => request<HistoryRow[]>('GET', '/api/history'),
   editHistory: (id: string, changes: HistoryEdit) => request<HistoryRow>('PATCH', `/api/history/${encodeURIComponent(id)}`, changes),
   deleteHistory: (id: string) => request<void>('DELETE', `/api/history/${encodeURIComponent(id)}`),
