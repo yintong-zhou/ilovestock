@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/yintong-zhou/ilovestock/actions/workflows/ci.yml/badge.svg)](https://github.com/yintong-zhou/ilovestock/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-0B3D62)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-1F6F8B)](LICENSE)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-1F6F8B)](https://github.com/yintong-zhou/ilovestock/blob/main/LICENSE)
 
 [Overview](#overview) • [Getting started](#getting-started) • [Usage](#usage) • [How the verdict works](#how-the-verdict-works) • [Data and limits](#data-and-limits) • [Development](#development)
 
@@ -28,7 +28,7 @@ ilovestock does that work for you. For each US ticker (NASDAQ, NYSE, AMEX), it:
 
 Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 
-![ilovestock analyze AAPL --detail: NO-BUY verdict with per-criterion detail and trade plan](docs/img/analyze-aapl.svg)
+![ilovestock analyze AAPL --detail: NO-BUY verdict with per-criterion detail and trade plan](https://raw.githubusercontent.com/yintong-zhou/ilovestock/main/docs/img/analyze-aapl.svg)
 
 ### Features
 
@@ -46,19 +46,14 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 ### Prerequisites
 
 - Python 3.11 or later
-- Git
 
 ### Installation
 
-ilovestock is not on PyPI yet. Install it from source:
-
 ```bash
-git clone https://github.com/yintong-zhou/ilovestock.git
-cd ilovestock
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e .
+pip install ilovestock
 ```
+
+The web UI is included. To work on the code, see [Development](#development).
 
 > [!CAUTION]
 > Fundamentals come from Finviz through scraping, and that may violate Finviz's terms of service. Finviz quotes are also delayed 15–20 minutes. Use ilovestock only if you accept that.
@@ -243,6 +238,10 @@ Each criterion's note shows where its value came from (`source: Finviz` or `sour
 ## Development
 
 ```bash
+git clone https://github.com/yintong-zhou/ilovestock.git
+cd ilovestock
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 
 pytest -m "not slow"     # offline tests on recorded fixtures
@@ -263,7 +262,7 @@ npm run build
 - Tests marked `slow` hit live Finviz to detect page changes. Run them on purpose with `pytest -m slow`.
 - Indicators are checked against TA-Lib, which is a dev dependency.
 - To re-record fixtures (this uses the network): `python execution/record_fixtures.py [TICKER] [FINVIZ_URL]`.
-- Project rules and release steps: [CONTRIBUTING.md](CONTRIBUTING.md).
+- Project rules and release steps: [CONTRIBUTING.md](https://github.com/yintong-zhou/ilovestock/blob/main/CONTRIBUTING.md).
 
 Project layout:
 

@@ -21,6 +21,10 @@ dependencies = [
     "uvicorn>=0.30",
 ]
 
+[project.urls]
+Repository = "https://github.com/yintong-zhou/ilovestock"
+Issues = "https://github.com/yintong-zhou/ilovestock/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "ta-lib>=0.6", "httpx>=0.27"]
 
