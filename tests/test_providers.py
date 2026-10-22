@@ -119,6 +119,7 @@ def test_finviz_snapshot_on_recorded_responses():
         "roe_pct": 0.42,
         "inst_own_pct": 82.64,
         "inst_trans_pct": -1.02,
+        "roic_pct": 0.28,
         "market_cap": pytest.approx(1.15e9),
         "dividend_yield_pct": None,  # "-": no dividend or missing -> fallback
         "next_earnings": None,  # "Jul 23 BMO": the last report, not the next
@@ -261,3 +262,21 @@ def test_early_close_uses_yahoo_session_end(fake_yf, end):
 
 def test_fundamentals_record_fetch_date(fake_yf, fake_finviz):
     assert finviz.FinvizProvider(YahooProvider(), TODAY).fundamentals("HZO").fetched == TODAY
+
+
+def test_parse_snapshot_roic():
+    data = json.loads((FIX / "AAPL_finviz.json").read_text())
+    assert finviz.parse_snapshot(data, date(2026, 10, 22))["roic_pct"] == 72.08
+
+
+def test_yahoo_operating_income(fake_yf):
+    f = YahooProvider().fundamentals("HZO")
+    assert f.operating_income[0] == 37219000.0 and f.operating_income[4] == 27515000.0
+
+
+def test_cache_loads_old_format_without_new_fields(tmp_path):
+    # cache JSON written before ROIC/operating income existed
+    old = {"sales": [1.0], "eps": [1.0], "roe_pct": 20.0, "market_cap": 1e9, "next_earnings": None}
+    (tmp_path / f"{date.today():%Y-%m-%d}_OLD_fundamentals.json").write_text(json.dumps(old))
+    f = CachedProvider(inner=None, cache_dir=tmp_path).fundamentals("OLD")
+    assert f.roic_pct is None and f.operating_income == []

@@ -31,6 +31,7 @@ KEYS = {
     "roe_pct": "ROE",  # "0.42%"
     "inst_own_pct": "Inst Own",  # "82.64%"
     "inst_trans_pct": "Inst Trans",  # "-1.02%"
+    "roic_pct": "ROIC",  # "72.08%"
 }
 MARKET_CAP = "Market Cap"  # "1.15B"
 DIVIDEND = "Dividend TTM"  # "1.06 (0.31%)"; "-" when none or missing

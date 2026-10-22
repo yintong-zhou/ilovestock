@@ -88,6 +88,7 @@ class YahooProvider:
         return Fundamentals(
             sales=_row(stmt, "Total Revenue"),
             eps=_row(stmt, "Diluted EPS", "Basic EPS"),
+            operating_income=_row(stmt, "Operating Income"),
             roe_pct=None if roe is None else roe * 100,
             market_cap=_num(info.get("marketCap")),
             next_earnings=dates[0] if dates else None,

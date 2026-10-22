@@ -56,6 +56,8 @@ class Fundamentals:
     sources: dict[str, str] = field(default_factory=dict)  # field name -> "Finviz" | "Yahoo"
     note: str = ""  # why Finviz data is missing
     fetched: date | None = None  # when this snapshot was taken (prices have their own date)
+    roic_pct: float | None = None  # Finviz "ROIC"; quality only, never a criterion
+    operating_income: list[float | None] = field(default_factory=list)  # quarterly (Yahoo)
 
 
 @dataclass

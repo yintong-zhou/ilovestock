@@ -83,9 +83,11 @@ def test_parse_snapshot_roic():
     data = json.loads((FIX / "AAPL_finviz.json").read_text())
     assert finviz.parse_snapshot(data, date(2026, 10, 22))["roic_pct"] == 72.08
 
+
 def test_yahoo_operating_income(fake_yf):
     f = YahooProvider().fundamentals("HZO")
     assert f.operating_income[0] == 37219000.0 and f.operating_income[4] == 27515000.0
+
 
 def test_cache_loads_old_format_without_new_fields(tmp_path):
     # JSON della cache scritto prima di questo task: mancano roic_pct e operating_income
@@ -131,20 +133,27 @@ def test_margin_change_same_quarter_last_year():
     op = [30.0, 15.0, 14.0, 13.0, 10.0]
     assert margin_change(sales, op) == (15.0, 10.0, 5.0)
 
-@pytest.mark.parametrize("sales,op", [
-    ([200.0, 1, 1, 1], [30.0, 1, 1, 1]),                      # 4 trimestri
-    ([200.0, 1, 1, 1, 0.0], [30.0, 1, 1, 1, 10.0]),           # fatturato 0
-    ([200.0, 1, 1, 1, 100.0], [None, 1, 1, 1, 10.0]),         # dato mancante
-])
+
+@pytest.mark.parametrize(
+    "sales,op",
+    [
+        ([200.0, 1, 1, 1], [30.0, 1, 1, 1]),  # 4 trimestri
+        ([200.0, 1, 1, 1, 0.0], [30.0, 1, 1, 1, 10.0]),  # fatturato 0
+        ([200.0, 1, 1, 1, 100.0], [None, 1, 1, 1, 10.0]),  # dato mancante
+    ],
+)
 def test_margin_change_nd(sales, op):
     assert margin_change(sales, op) == (None, None, None)
+
 
 def test_ranks_ties_and_none():
     assert ranks([10.0, None, 10.0, 5.0]) == [1, None, 1, 3]
 
+
 def test_scores_scale_and_average():
     q = lambda roic, chg: Quality(roic, None, None, chg)
     assert scores([q(30, 3), q(20, 1), q(10, 2)]) == [100.0, 25.0, 25.0]
+
 
 def test_scores_none_is_worst_and_single_is_100():
     q = lambda roic, chg: Quality(roic, None, None, chg)
@@ -185,9 +194,12 @@ def test_scores_none_is_worst_and_single_is_100():
 def test_fundamental_checks_is_what_analyze_uses(fake_yf, fake_finviz, bench_close):
     p = FinvizProvider(YahooProvider())
     r = analyze("HZO", p, bench_close, CFG, date(2026, 10, 22))
-    fund, earn = fundamental_checks(p.fundamentals("HZO"), p.history("HZO"), CFG, date(2026, 10, 22))
+    fund, earn = fundamental_checks(
+        p.fundamentals("HZO"), p.history("HZO"), CFG, date(2026, 10, 22)
+    )
     assert r.fundamental == fund and r.earnings == earn
     assert r.quality.roic_pct == 0.28
+
 
 # tests/test_quality.py
 def test_quality_text_signs_and_nd():
@@ -195,10 +207,12 @@ def test_quality_text_signs_and_nd():
     assert quality_text(Quality(5.0, 1.0, 1.5, -0.5)) == "ROIC 5.0%, op. margin -0.5 pt"
     assert quality_text(Quality(None, None, None, None)) == "ROIC N/D, op. margin N/D"
 
+
 # tests/test_cli.py
 def test_detail_shows_quality_row(offline):
     result = runner.invoke(cli.app, ["analyze", "HZO", "--detail"])
     assert result.exit_code == 0 and "Quality" in result.output and "INFO" in result.output
+
 
 # tests/test_api.py: nel test esistente che analizza HZO (se non c'è, in uno nuovo
 # sbloccato con unlocked(client)) aggiungere
@@ -242,22 +256,36 @@ def test_detail_shows_quality_row(offline):
 ```python
 DEFAULT = load(Path("does-not-exist.toml"))
 
+
 def test_filters_default_config():
     assert finviz_filters(DEFAULT) == [
-        "fa_salesqoq_o20", "fa_epsqoq_o15", "fa_roe_o15", "sh_instown_u80",
-        "sh_insttrans_pos", "fa_div_none", "cap_microover",
+        "fa_salesqoq_o20",
+        "fa_epsqoq_o15",
+        "fa_roe_o15",
+        "sh_instown_u80",
+        "sh_insttrans_pos",
+        "fa_div_none",
+        "cap_microover",
     ]
 
+
 def test_filters_take_the_loosest_bucket():
-    cfg = replace(DEFAULT, sales_growth_min=22, eps_growth_min=12, roe_min=3, institutional_own_max=85)
+    cfg = replace(
+        DEFAULT, sales_growth_min=22, eps_growth_min=12, roe_min=3, institutional_own_max=85
+    )
     f = finviz_filters(cfg)
     assert "fa_salesqoq_o20" in f and "fa_epsqoq_o10" in f and "sh_instown_u90" in f
     assert not any(x.startswith("fa_roe") for x in f)
-    assert not any(x.startswith("sh_instown") for x in finviz_filters(replace(DEFAULT, institutional_own_max=95)))
+    assert not any(
+        x.startswith("sh_instown")
+        for x in finviz_filters(replace(DEFAULT, institutional_own_max=95))
+    )
+
 
 def test_filters_qoq_leaves_growth_out():
     f = finviz_filters(replace(DEFAULT, growth_basis="qoq"))
     assert not any(x.startswith(("fa_salesqoq", "fa_epsqoq")) for x in f)
+
 
 def test_screener_url_has_no_country_filter():
     assert "geo_" not in screener_url(DEFAULT)
@@ -283,10 +311,15 @@ def applied_filters(html: str) -> set[str]:
     m = re.search(r'screener-split-applied-filters"><span> <b>Filters:</b> (.*?)</span>', html)
     return set(m.group(1).replace("<!-- -->", " ").split())
 
+
 def test_finviz_accepts_every_generated_filter():
     html = (FIX / "finviz_screener_default.html").read_text(encoding="utf-8")
-    shown = {code.rsplit("_", 1)[0] + ":" + code.rsplit("_", 1)[1] for code in finviz_filters(DEFAULT)}
-    assert shown <= applied_filters(html)  # Finviz ignores unknown codes: a missing one = wrong code
+    shown = {
+        code.rsplit("_", 1)[0] + ":" + code.rsplit("_", 1)[1] for code in finviz_filters(DEFAULT)
+    }
+    assert shown <= applied_filters(
+        html
+    )  # Finviz ignores unknown codes: a missing one = wrong code
 ```
 
   Se un codice manca da `applied_filters`, il codice è sbagliato. Correggi la tabella degli
@@ -334,24 +367,43 @@ def test_finviz_accepts_every_generated_filter():
 
 ```python
 class FakeProvider:
-    def __init__(self, data: dict[str, Fundamentals | Exception]): self.data = data
+    def __init__(self, data: dict[str, Fundamentals | Exception]):
+        self.data = data
+
     def _get(self, t):
         v = self.data[t]
-        if isinstance(v, Exception): raise v
+        if isinstance(v, Exception):
+            raise v
         return v
-    def history(self, t): self._get(t); return prices()
-    def fundamentals(self, t): return self._get(t)
+
+    def history(self, t):
+        self._get(t)
+        return prices()
+
+    def fundamentals(self, t):
+        return self._get(t)
+
 
 def run(monkeypatch, data, **kw):
     monkeypatch.setattr(finviz, "screener_tickers", lambda url, limit=None: list(data))
     return screen(FakeProvider(data), kw.pop("cfg", CFG), TODAY, **kw)
 
+
 def test_screen_keeps_only_all_pass_and_counts(monkeypatch):
-    r = run(monkeypatch, {"A": good_fundamentals(roic_pct=20.0), "B": good_fundamentals(roe_pct=10.0), "C": DataError("x")})
+    r = run(
+        monkeypatch,
+        {
+            "A": good_fundamentals(roic_pct=20.0),
+            "B": good_fundamentals(roe_pct=10.0),
+            "C": DataError("x"),
+        },
+    )
     assert (r.candidates, r.passed, r.errors, [h.ticker for h in r.hits]) == (3, 1, ["C"], ["A"])
+
 
 def test_screen_nd_never_passes(monkeypatch):
     assert run(monkeypatch, {"A": good_fundamentals(inst_own_pct=None)}).passed == 0
+
 
 def test_screen_ranks_and_cuts(monkeypatch):
     # operating_income vuoto per tutti: margine N/D, conta solo il ROIC
@@ -360,16 +412,21 @@ def test_screen_ranks_and_cuts(monkeypatch):
     assert r.passed == 3 and [h.ticker for h in r.hits] == ["A", "C"]
     assert (r.hits[0].roic_rank, r.hits[0].margin_rank) == (1, None)
 
+
 def test_screen_max_above_passed_shows_all(monkeypatch):
     data = {t: good_fundamentals() for t in ("A", "B", "C")}
     assert len(run(monkeypatch, data, max_results=20).hits) == 3
+
 
 def test_screen_ignores_post_earnings(monkeypatch):
     f = good_fundamentals(last_earnings=TODAY - timedelta(days=1), last_earnings_amc=True)
     assert run(monkeypatch, {"A": f}).passed == 1
 
+
 def test_screen_too_many_candidates(monkeypatch):
-    def boom(url, limit=None): raise finviz.TooManyResults("x", total=150)
+    def boom(url, limit=None):
+        raise finviz.TooManyResults("x", total=150)
+
     monkeypatch.setattr(finviz, "screener_tickers", boom)
     with pytest.raises(finviz.FinvizError, match="150 candidates from Finviz: max 100"):
         screen(FakeProvider({}), CFG, TODAY)
@@ -428,9 +485,12 @@ def test_screen_none_pass_exits_zero_without_file(offline):
     assert "No stock passes" in result.output and not (offline / "w.txt").exists()
     assert "Skipped for data errors: SCRN" in result.output
 
+
 def test_screen_saves_watchlist(offline, monkeypatch):
-    hits = [ScreenHit("ABCD", "1,240M (small)", Quality(31.2, 18.1, 14.0, 4.1), 96.0, 2, 3),
-            ScreenHit("EFGH", "640M (small)", Quality(22.8, 9.0, 2.7, 6.3), 93.0, 4, 1)]
+    hits = [
+        ScreenHit("ABCD", "1,240M (small)", Quality(31.2, 18.1, 14.0, 4.1), 96.0, 2, 3),
+        ScreenHit("EFGH", "640M (small)", Quality(22.8, 9.0, 2.7, 6.3), 93.0, 4, 1),
+    ]
     monkeypatch.setattr(cli.screener, "screen", lambda *a, **k: ScreenResult(47, 47, [], hits))
     out = offline / "w.txt"
     result = runner.invoke(cli.app, ["screen", "--max", "2", "--out", str(out)])
@@ -438,6 +498,7 @@ def test_screen_saves_watchlist(offline, monkeypatch):
     assert inputs.read_watchlist(out) == ["ABCD", "EFGH"]
     assert f"ilovestock analyze --watchlist {out}" in result.output.replace("\n", "")
     assert "ROIC #2, margin #3 of 47" in result.output
+
 
 def test_screen_max_is_bounded():
     assert runner.invoke(cli.app, ["screen", "--max", "51"]).exit_code == 2
@@ -478,20 +539,28 @@ def test_screen_max_is_bounded():
 def test_screen_needs_session(client):
     assert client.post("/api/screen", json={"max": 20}).status_code == 401
 
+
 def test_screen_bounds(client):
     unlocked(client)
     assert client.post("/api/screen", json={"max": 51}).status_code == 422
 
+
 def test_screen_returns_hits_and_no_history(client, monkeypatch, tmp_path):
     unlocked(client)
-    monkeypatch.setattr("ilovestock.providers.finviz.screener_tickers", lambda url, limit=None: ["HZO"])
+    monkeypatch.setattr(
+        "ilovestock.providers.finviz.screener_tickers", lambda url, limit=None: ["HZO"]
+    )
     body = client.post("/api/screen", json={"max": 20}).json()
     assert (body["candidates"], body["passed"], body["hits"]) == (1, 0, [])
     assert not (tmp_path / "history.csv").exists()
 
+
 def test_screen_too_many_is_422(client, monkeypatch):
     unlocked(client)
-    def boom(url, limit=None): raise finviz.TooManyResults("x", total=150)
+
+    def boom(url, limit=None):
+        raise finviz.TooManyResults("x", total=150)
+
     monkeypatch.setattr("ilovestock.providers.finviz.screener_tickers", boom)
     r = client.post("/api/screen", json={})
     assert r.status_code == 422 and "150 candidates" in r.json()["detail"]
