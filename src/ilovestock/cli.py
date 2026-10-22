@@ -8,16 +8,17 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from ilovestock import config as cfgmod
-from ilovestock import export, history, inputs
+from ilovestock import export, history, inputs, screener
 from ilovestock.analysis import analyze_many
 from ilovestock.models import DISCLAIMER
 from ilovestock.providers import finviz
 from ilovestock.providers.base import BENCHMARK
 from ilovestock.providers.cache import CachedProvider
 from ilovestock.providers.yahoo import YahooProvider
-from ilovestock.report import print_report
+from ilovestock.report import print_report, screen_table
 
 app = typer.Typer(help=f"BUY / NO-BUY verdict + trade plan for US stocks. {DISCLAIMER}")
 config_app = typer.Typer(help="Manage the config file.")
@@ -121,6 +122,58 @@ def analyze(
     if formats:
         for path in export.write_reports(results, formats, out_dir, cfg, datetime.now()):
             console.print(f"Report written: {path}")
+
+
+@app.command()
+def screen(
+    max_results: Annotated[
+        int,
+        typer.Option("--max", min=1, max=screener.MAX_RESULTS, help="Max stocks in the list"),
+    ] = screener.DEFAULT_RESULTS,
+    out: Annotated[
+        Path | None, typer.Option(help="Watchlist file (default: reports/screen-DATE.txt)")
+    ] = None,
+    config_file: Annotated[Path | None, typer.Option("--config", help="Config file")] = None,
+) -> None:
+    """Find US-listed stocks that pass every fundamental rule, ranked by quality (ROIC and
+    operating margin change). Only stocks with complete Finviz data are searched."""
+    try:
+        cfg = cfgmod.load(config_file)
+    except cfgmod.ConfigError as e:
+        _fail(str(e))
+    today = date.today()
+    provider = CachedProvider(finviz.FinvizProvider(YahooProvider()))
+    console.print(f"[dim]{finviz.WARNING}[/]")
+    console.print("[dim]Only stocks with complete Finviz data are searched.[/]")
+    with console.status("Searching Finviz...") as status:
+        try:
+            result = screener.screen(
+                provider, cfg, today, max_results, lambda t: status.update(f"Checking {t}...")
+            )
+        except finviz.FinvizError as e:
+            _fail(str(e))
+        except Exception as e:
+            _fail(f"Finviz screener failed: {e}")
+    console.print(
+        f"{result.candidates} candidates from Finviz, {result.passed} pass every fundamental"
+        f" rule, showing {len(result.hits)} by quality score"
+    )
+    if result.errors:
+        console.print(f"[dim]Skipped for data errors: {', '.join(result.errors)}[/]")
+    if not result.hits:
+        console.print("No stock passes every fundamental rule.")
+    else:
+        console.print(screen_table(result))
+        path = out or Path("reports") / f"screen-{today:%Y-%m-%d}.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        header = (
+            f"# ilovestock screen {today}: top {len(result.hits)} of {result.passed}"
+            f" by quality score. {DISCLAIMER}"
+        )
+        path.write_text("\n".join([header, *(h.ticker for h in result.hits)]) + "\n", "utf-8")
+        console.print(f"Watchlist saved: {escape(str(path))}")
+        console.print(f"Next: ilovestock analyze --watchlist {escape(str(path))}")
+    console.print(f"[bold yellow]{DISCLAIMER}[/]")
 
 
 @config_app.command("init")

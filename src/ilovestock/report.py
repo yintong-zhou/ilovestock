@@ -14,6 +14,7 @@ from ilovestock.models import (
     TradePlan,
     Verdict,
 )
+from ilovestock.screener import ScreenResult
 
 STATUS_STYLE = {Status.PASS: "green", Status.FAIL: "red", Status.ND: "yellow"}
 QUALITY_NOTE = "informative, does not change the verdict"
@@ -23,10 +24,38 @@ def _fmt(v: float | None) -> str:
     return "N/D" if v is None else f"{v:,.2f}"
 
 
+def _roic(q: Quality) -> str:
+    return "N/D" if q.roic_pct is None else f"{q.roic_pct:.1f}%"
+
+
+def _margin_change(q: Quality) -> str:
+    return "N/D" if q.margin_change_pt is None else f"{q.margin_change_pt:+.1f} pt"
+
+
 def quality_text(q: Quality) -> str:
-    roic = "N/D" if q.roic_pct is None else f"{q.roic_pct:.1f}%"
-    chg = "N/D" if q.margin_change_pt is None else f"{q.margin_change_pt:+.1f} pt"
-    return f"ROIC {roic}, op. margin {chg}"
+    return f"ROIC {_roic(q)}, op. margin {_margin_change(q)}"
+
+
+def _rank(r: int | None) -> str:
+    return "N/D" if r is None else f"#{r}"
+
+
+def screen_table(result: ScreenResult) -> Table:
+    # ASCII headers: a Windows pipe (cp1252) mangles symbols like the delta sign
+    t = Table(title="ilovestock: screen")
+    for col in ("#", "Ticker", "Market cap", "ROIC", "Op. margin chg (1y)", "Score", "Ranks"):
+        t.add_column(col, justify="right" if col in ("#", "ROIC", "Score") else "left")
+    for i, h in enumerate(result.hits, 1):
+        t.add_row(
+            str(i),
+            h.ticker,
+            h.market_cap or "N/D",
+            _roic(h.quality),
+            _margin_change(h.quality),
+            f"{h.score:.0f}",
+            f"ROIC {_rank(h.roic_rank)}, margin {_rank(h.margin_rank)} of {result.passed}",
+        )
+    return t
 
 
 VERDICT_STYLE = {

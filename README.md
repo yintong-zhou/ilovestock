@@ -38,6 +38,7 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 - **Technical confirmations.** Relative strength vs the S&P 500, Donchian breakout on the weekly close after a consolidation, with volume, DMI/ADX and SMA 200, all with fixed parameters.
 - **Trade plan.** Entry, technical stop, take profit in R multiples, and position sizing capped by maximum exposure.
 - **Report files.** Markdown, CSV and JSON export, each with data date, sources and disclaimer.
+- **Fundamentals-first screener.** Finds the US-listed stocks that pass every fundamental rule and ranks them by quality, ready for the full analysis.
 - **Flexible input.** Tickers on the command line, a watchlist file and a Finviz screener URL can be combined; duplicates are removed.
 - **Layered config.** Course defaults, then a TOML file, then CLI options.
 
@@ -65,6 +66,30 @@ ilovestock --help
 ```
 
 ## Usage
+
+### Find candidates (fundamentals first)
+
+```bash
+ilovestock screen            # top 20
+ilovestock screen --max 10   # 1 to 50
+```
+
+The screener builds a Finviz screener query from your config thresholds, then checks every candidate with the same fundamental and earnings rules as `analyze`. A stock is listed only if every one of those criteria is `PASS`. The stocks that pass are ranked by a **quality score**, because sales growth alone says nothing about profit:
+
+- **ROIC**: operating profit per dollar invested in the business (Finviz).
+- **Operating margin change**: operating margin of the last quarter minus the same quarter a year earlier, in points (Yahoo). A falling margin means costs grow faster than sales.
+
+Each stock gets a rank on both measures within the stocks that passed. The score is the average of the two ranks, scaled 0–100 (100 = best of the group). The score never changes a verdict: `analyze --detail` shows ROIC and margin change as an informative `Quality` row.
+
+The list is saved as a watchlist (default `reports/screen-YYYY-MM-DD.txt`, change it with `--out`) and the command prints the next step:
+
+```bash
+ilovestock analyze --watchlist reports/screen-2026-10-22.txt
+```
+
+- Only stocks with complete Finviz data are searched: a stock with a missing Finviz value on a filtered field never reaches the candidates, even if Yahoo has it.
+- A search stops with more than 100 candidates: tighten the thresholds in the config. Each candidate takes a few seconds.
+- With `growth_basis = "qoq"`, growth is not filtered on Finviz (it only has year-on-year), so more candidates come back.
 
 ### Analyze tickers
 

@@ -5,7 +5,8 @@ from rich.console import Console
 from typer.testing import CliRunner
 
 from ilovestock import cli, config, history, inputs
-from ilovestock.models import DISCLAIMER
+from ilovestock.models import DISCLAIMER, Quality
+from ilovestock.screener import ScreenHit, ScreenResult
 
 runner = CliRunner()
 
@@ -185,3 +186,33 @@ def test_detail_shows_quality_row(offline):
     assert result.exit_code == 0, result.output
     assert "Quality" in result.output and "INFO" in result.output
     assert "ROIC 0.3%" in result.output
+
+
+# --- screen ---
+def test_screen_none_pass_exits_zero_without_file(offline):
+    # offline: screener_tickers -> ["SCRN", "HZO"]; SCRN has no data, HZO fails (ROE 0.42%)
+    result = runner.invoke(cli.app, ["screen", "--out", str(offline / "w.txt")])
+    assert result.exit_code == 0, result.output
+    assert "No stock passes" in result.output and not (offline / "w.txt").exists()
+    assert "Skipped for data errors: SCRN" in result.output
+    assert "2 candidates from Finviz, 0 pass every fundamental rule" in result.output
+
+
+def test_screen_saves_watchlist(offline, monkeypatch):
+    hits = [
+        ScreenHit("ABCD", "1,240M (small)", Quality(31.2, 18.1, 14.0, 4.1), 96.0, 2, 3),
+        ScreenHit("EFGH", "640M (small)", Quality(22.8, 9.0, 2.7, 6.3), 93.0, 4, 1),
+    ]
+    monkeypatch.setattr(cli.screener, "screen", lambda *a, **k: ScreenResult(47, 47, [], hits))
+    out = offline / "w.txt"
+    result = runner.invoke(cli.app, ["screen", "--max", "2", "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert inputs.read_watchlist(out) == ["ABCD", "EFGH"]
+    assert f"ilovestock analyze --watchlist {out}" in result.output.replace("\n", "")
+    assert "ROIC #2, margin #3 of 47" in result.output
+    assert DISCLAIMER in result.output.replace("\n", " ")
+
+
+def test_screen_max_is_bounded():
+    result = runner.invoke(cli.app, ["screen", "--max", "51"])
+    assert result.exit_code == 2 and "1<=x<=50" in result.output
