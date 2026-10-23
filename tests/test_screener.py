@@ -1,5 +1,6 @@
 """Fundamentals-first screener: Finviz pre-filter, exact check, quality ranking (offline)."""
 
+import itertools
 import re
 from dataclasses import replace
 from datetime import date, timedelta
@@ -100,6 +101,15 @@ def test_candidates_are_micro_to_mid_by_cap(monkeypatch):
     monkeypatch.setattr(finviz, "screener_rows", rows)
     r = screen(FakeProvider({t: good_fundamentals() for t in ("MID", "MIC")}), CFG, TODAY)
     assert r.candidates == 2 and sorted(h.ticker for h in r.hits) == ["MIC", "MID"]
+
+
+def test_candidates_bound_the_rows_read(monkeypatch):
+    # large/giant rows are fetched but skipped: they need their own cap on Finviz requests
+    giants = ((f"G{i}", 1e12 - i) for i in itertools.count())
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: giants)
+    with pytest.raises(finviz.FinvizError, match="more than 1000 Finviz rows"):
+        screen(FakeProvider({}), CFG, TODAY)
+    assert next(giants)[0] == "G1001"  # stopped right after the limit
 
 
 def test_candidates_refuse_an_ignored_sort(monkeypatch):

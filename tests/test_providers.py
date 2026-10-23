@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date
 
 import pandas as pd
@@ -193,8 +194,8 @@ def test_parse_screener_rows_reads_market_cap():
     assert len(rows) == 20 and rows[0][0] == "AFRM" and rows[0][1] == pytest.approx(24.52e9)
 
 
-def test_screener_rows_page_lazily(monkeypatch):
-    pages = {1: "finviz_screener_p1.html", 21: "finviz_screener_p2.html"}  # 261 results
+def fake_pages(monkeypatch, pages: dict[int, str]) -> list[int]:
+    """requests.get serving screener pages by start row; returns the rows requested."""
     calls = []
 
     class Resp:
@@ -206,13 +207,39 @@ def test_screener_rows_page_lazily(monkeypatch):
 
     def get(url, params, **_):
         calls.append(params["r"])
-        name = pages.get(params["r"])
-        return Resp((FIX / name).read_text(encoding="utf-8") if name else "<html></html>")
+        return Resp(pages.get(params["r"], "<html></html>"))
 
     monkeypatch.setattr(finviz.requests, "get", get)
-    rows = finviz.screener_rows("https://finviz.com/screener.ashx?v=111&o=-marketcap")
+    return calls
+
+
+SORTED_URL = "https://finviz.com/screener.ashx?v=111&o=-marketcap"
+P1 = (FIX / "finviz_screener_p1.html").read_text(encoding="utf-8")  # 261 results
+P2 = (FIX / "finviz_screener_p2.html").read_text(encoding="utf-8")
+
+
+def test_screener_rows_page_lazily(monkeypatch):
+    calls = fake_pages(monkeypatch, {1: P1, 21: P2})
+    rows = finviz.screener_rows(SORTED_URL)
     assert [next(rows) for _ in range(21)][20][0] == "ARDX" and calls == [1, 21]
-    assert len(list(rows)) == 19 and calls == [1, 21, 41]  # an empty page ends the rows
+    # page 3 of 261 results has no rows: a changed page, not the end of the list
+    with pytest.raises(finviz.FinvizError, match="no rows"):
+        list(rows)
+
+
+@pytest.mark.parametrize(
+    "page,error",
+    [
+        (re.sub(r"#\d+ / \d+ Total", "", P1), "result count not found"),  # would stop at page 1
+        (P1.replace('data-row-key="AADX"', 'data-row-key="?"'), "rows not recognized"),
+        ("<html></html>", "no rows"),  # no match, or a page we cannot read
+    ],
+    ids=["no-count", "row-missed", "empty"],
+)
+def test_screener_rows_unreadable_page_is_an_error(monkeypatch, page, error):
+    fake_pages(monkeypatch, {1: page})
+    with pytest.raises(finviz.FinvizError, match=error):
+        list(finviz.screener_rows(SORTED_URL))
 
 
 def test_screener_rejects_other_hosts():

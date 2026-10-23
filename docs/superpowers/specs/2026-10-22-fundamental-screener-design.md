@@ -81,7 +81,11 @@ Per questo i titoli si ordinano con un punteggio di qualità, non per crescita d
      `PROJECT.md`). Serve una richiesta dal vivo, da chiedere prima all'utente, e la pagina va
      salvata come fixture.
 2. **Tetto sui candidati.** Se il pre-filtro restituisce più di `MAX_CANDIDATES` titoli micro,
-   small o mid (valore 100), la ricerca si ferma e chiede soglie più strette. 100 tiene una ricerca sotto i 5 minuti circa, quindi `/api/screen` può restare
+   small o mid (valore 100), la ricerca si ferma e chiede soglie più strette. Le righe large e
+   giant si scaricano ma non contano, quindi c'è un secondo tetto: `MAX_ROWS` (1000 righe, al
+   massimo 50 pagine) prima della prima nano. Una pagina Finviz illeggibile (senza contatore,
+   senza righe, o con righe non riconosciute) ferma la ricerca con un errore e non dà mai una
+   lista parziale. 100 tiene una ricerca sotto i 5 minuti circa, quindi `/api/screen` può restare
    una richiesta sincrona come `/api/analyze`, senza job in background. L'utente ha deciso di
    tenere 100 senza misurare prima il numero reale di candidati: se le sue soglie ne danno di
    più, le stringe lui.

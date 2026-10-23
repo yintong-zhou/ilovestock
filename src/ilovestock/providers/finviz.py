@@ -147,6 +147,8 @@ def parse_screener_page(html: str) -> tuple[list[str], int]:
     """Tickers on one screener page and the total result count."""
     total = re.search(r"#\d+ / (\d+) Total", html)
     tickers = dict.fromkeys(re.findall(r'href="/quote\?t=([A-Z0-9.\-]+)&', html))
+    if tickers and not total:  # a total of 0 would silently stop the reading at page 1
+        raise FinvizError("screener page changed: result count not found")
     return list(tickers), int(total.group(1)) if total else 0
 
 
@@ -165,9 +167,11 @@ def screener_rows(url: str) -> Iterator[tuple[str, float | None]]:
         resp = requests.get(url, params={"r": row}, headers={"User-Agent": UA}, timeout=30)
         resp.raise_for_status()
         rows = parse_screener_rows(resp.text)
-        if not rows:
-            return
-        total = parse_screener_page(resp.text)[1]
+        tickers, total = parse_screener_page(resp.text)
+        if not rows:  # page 1 with no match, or any page we cannot read: never a silent end
+            raise FinvizError("no rows: no stock matches the filters, or the Finviz page changed")
+        if len(rows) != len(tickers):  # a row the parser missed would be silently dropped
+            raise FinvizError("screener page changed: rows not recognized")
         yield from rows
         row += PAGE_SIZE
 

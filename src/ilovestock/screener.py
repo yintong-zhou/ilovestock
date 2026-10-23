@@ -15,6 +15,7 @@ from ilovestock.quality import quality, ranks, scores
 from ilovestock.rules.fundamental import market_cap_band
 
 MAX_CANDIDATES = 100  # each candidate costs Finviz + Yahoo requests: ~5 minutes at most
+MAX_ROWS = 1000  # rows read before the first nano, large/giant included: 50 page requests at most
 DEFAULT_RESULTS = 20
 MAX_RESULTS = inputs.MAX_TICKERS  # the list goes to `analyze`, which takes at most this many
 SCREENER_URL = "https://finviz.com/screener.ashx?v=111&f="
@@ -62,7 +63,12 @@ def candidates(cfg: Config) -> list[str]:
     """
     tickers: dict[str, None] = {}
     last = math.inf
-    for t, cap in finviz.screener_rows(screener_url(cfg)):
+    for i, (t, cap) in enumerate(finviz.screener_rows(screener_url(cfg)), 1):
+        if i > MAX_ROWS:
+            raise finviz.FinvizError(
+                f"more than {MAX_ROWS} Finviz rows above the nano caps. "
+                "Tighten the fundamental thresholds in the config"
+            )
         if cap is None:
             continue
         if cap > last:  # stopping at the first nano is only safe in this order
