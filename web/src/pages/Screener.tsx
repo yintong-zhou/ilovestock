@@ -21,7 +21,7 @@ function Note({ hit, n }: { hit: ScreenHit; n: number }) {
         Operating margin {pct(q.margin_year_ago_pct)} → {pct(q.margin_pct)} vs the same quarter last year (
         {points(q.margin_change_pt)}) → {rank(hit.margin_rank, n)}
       </p>
-      <p>Score = average of the two ranks, 0–100 (100 = best of the {n})</p>
+      <p>Score = average of the two ranks as percentiles, 0–100 (100 = best, 0 = worst of the {n})</p>
     </div>
   )
 }

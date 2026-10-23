@@ -274,6 +274,16 @@ def test_analysis_error_stays_with_its_ticker(fake_yf):
     assert r.verdict == Verdict.NO_BUY and r.error and r.reasons[0].startswith("Analysis error")
 
 
+def test_quality_error_stays_with_its_ticker(fake_yf):
+    class Broken(YahooProvider):
+        def fundamentals(self, t):  # malformed operating income
+            return replace(super().fundamentals(t), operating_income=["?"] * 5)
+
+    cfg = load(Path("does-not-exist.toml"))
+    (r,) = analyze_many(["HZO"], Broken(), cfg, date(2026, 10, 20))
+    assert r.error and r.reasons[0].startswith("Analysis error")
+
+
 def _closes(*values, end="2026-10-20"):
     return pd.DataFrame({"Close": values}, index=pd.bdate_range(end=end, periods=len(values)))
 

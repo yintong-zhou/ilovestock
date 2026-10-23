@@ -115,10 +115,12 @@ class FinvizProvider:
         return self.fallback.history(ticker)
 
     def fundamentals(self, ticker: str) -> Fundamentals:
+        notes = []  # a non-empty note keeps the snapshot out of the cache and the screener
         try:
             base = self.fallback.fundamentals(ticker)
-        except Exception:
+        except Exception as e:
             base = Fundamentals(sales=[], eps=[], roe_pct=None, market_cap=None, next_earnings=None)
+            notes.append(f"Yahoo error: {e}")
         sources = {
             k: "Yahoo"
             for k in ("roe_pct", "market_cap", "next_earnings", "inst_own_pct")
@@ -127,13 +129,14 @@ class FinvizProvider:
         today = self.today
         try:
             fv = parse_snapshot(finviz.get_stock(ticker), today)
-            note = ""
         except Exception as e:  # scraping: any site change surfaces here
-            fv, note = {}, f"Finviz error: {e}"
+            fv = {}
+            notes.append(f"Finviz error: {e}")
         finally:  # the lib caches pages forever: drop it so the next call refetches
             finviz.main_func.STOCK_PAGE.pop(ticker, None)
         found = {k: v for k, v in fv.items() if v is not None}
         sources.update(dict.fromkeys(found, "Finviz"))
+        note = "; ".join(notes)
         return dataclasses.replace(base, **found, sources=sources, note=note, fetched=today)
 
 

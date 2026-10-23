@@ -79,7 +79,7 @@ The screener builds a Finviz screener query from your config thresholds, then ch
 - **ROIC**: operating profit per dollar invested in the business (Finviz).
 - **Operating margin change**: operating margin of the last quarter minus the same quarter a year earlier, in points (Yahoo). A falling margin means costs grow faster than sales.
 
-Each stock gets a rank on both measures within the stocks that passed. The score is the average of the two ranks, scaled 0–100 (100 = best of the group). The score never changes a verdict: `analyze --detail` shows ROIC and margin change as an informative `Quality` row.
+Each stock gets a rank on both measures within the stocks that passed. Each rank becomes a percentile, 0–100 (100 = best, 0 = worst of the group), and the score is the average of the two percentiles. The score never changes a verdict: `analyze --detail` shows ROIC and margin change as an informative `Quality` row.
 
 The list is saved as a watchlist (default `reports/screen-YYYY-MM-DD.txt`, change it with `--out`) and the command prints the next step:
 

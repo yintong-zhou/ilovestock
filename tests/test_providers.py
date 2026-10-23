@@ -298,6 +298,16 @@ def test_cache_skips_failed_finviz_snapshot(tmp_path):
     assert inner.calls == 2 and not list(tmp_path.glob("*.json"))
 
 
+def test_yahoo_failure_is_noted_and_not_cached(fake_yf, fake_finviz, monkeypatch, tmp_path):
+    def boom(self, t):
+        raise RuntimeError("yahoo down")
+
+    monkeypatch.setattr(YahooProvider, "fundamentals", boom)
+    f = CachedProvider(finviz.FinvizProvider(YahooProvider(), TODAY), tmp_path).fundamentals("HZO")
+    assert f.roe_pct == 0.42 and f.sales == [] and f.note == "Yahoo error: yahoo down"
+    assert not list(tmp_path.glob("*.json"))
+
+
 def test_finviz_page_refetched_each_call(fake_yf, monkeypatch):
     monkeypatch.setattr(finviz.finviz.main_func, "STOCK_PAGE", {})
     pages = iter([{"ROE": "1%"}, {"ROE": "2%"}])

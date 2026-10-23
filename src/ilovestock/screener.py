@@ -94,15 +94,16 @@ def screen(
             daily = provider.history(t)
             fund = provider.fundamentals(t)
             fund_results, earn = fundamental_checks(fund, daily, cfg, today)
+            q = quality(fund)
         except Exception:  # unofficial sources: skip the ticker, keep the search going
             errors.append(t)
             continue
-        if fund.note:  # Finviz quote page failed (e.g. 429): a fetch error, not a failed rule
+        if fund.note:  # a source failed (e.g. Finviz 429): a fetch error, not a failed rule
             errors.append(t)
             continue
         if all(c.status == Status.PASS for c in [*fund_results, earn]):
             cap = next((c.value for c in fund_results if c.name == "Market cap"), None)
-            passed.append((t, cap, quality(fund)))
+            passed.append((t, cap, q))
     qs = [q for _, _, q in passed]
     roic_ranks, margin_ranks = (
         ranks([q.roic_pct for q in qs]),

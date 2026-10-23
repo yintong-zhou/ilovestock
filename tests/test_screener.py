@@ -144,3 +144,9 @@ def test_screen_reports_finviz_fetch_failure_as_error(monkeypatch):
     f = good_fundamentals(inst_trans_pct=None, note="Finviz error: 429")
     r = run(monkeypatch, {"A": f, "B": good_fundamentals()})
     assert (r.errors, r.passed, [h.ticker for h in r.hits]) == (["A"], 1, ["B"])
+
+
+def test_screen_malformed_quality_data_skips_only_that_ticker(monkeypatch):
+    bad = good_fundamentals(operating_income=["?"] * 5)
+    r = run(monkeypatch, {"A": bad, "B": good_fundamentals()})
+    assert (r.errors, [h.ticker for h in r.hits]) == (["A"], ["B"])

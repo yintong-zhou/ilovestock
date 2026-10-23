@@ -19,6 +19,11 @@ def test_margin_change_same_quarter_last_year():
     assert margin_change(sales, op) == (15.0, 10.0, 5.0)
 
 
+def test_margin_change_rounds_after_subtracting():
+    # 10.004% vs 9.996%: both show as 10.0, but the change is +0.008 pt, not 0
+    assert margin_change([1000.0] * 5, [100.04, 1, 1, 1, 99.96]) == (10.0, 10.0, 0.01)
+
+
 @pytest.mark.parametrize(
     "sales,op",
     [

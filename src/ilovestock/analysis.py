@@ -46,6 +46,7 @@ def analyze(
         ]
         plan = trade_plan(daily, cfg)
         v, reasons = verdict(fund_results, tech_results, earn, plan, allow_missing)
+        q = quality(fund)
     except Exception as e:  # malformed data: this ticker fails, not the benchmark or the run
         msg = f"{type(e).__name__}: {e}"
         return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Analysis error: {msg}"], error=msg)
@@ -60,7 +61,7 @@ def analyze(
         data_date=daily.index[-1].date(),
         price=round(float(daily["Close"].iloc[-1]), 2),
         fundamentals_date=fund.fetched,
-        quality=quality(fund),
+        quality=q,
     )
 
 

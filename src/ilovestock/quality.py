@@ -14,8 +14,8 @@ def margin_change(
     pairs = [(sales[i], operating_income[i]) for i in (0, 4)]
     if any(s is None or op is None or s <= 0 for s, op in pairs):
         return None, None, None
-    now, ago = (round(op / s * 100, 2) for s, op in pairs)
-    return now, ago, round(now - ago, 2)
+    now, ago = (op / s * 100 for s, op in pairs)
+    return round(now, 2), round(ago, 2), round(now - ago, 2)
 
 
 def quality(f: Fundamentals) -> Quality:

@@ -54,7 +54,7 @@ class Fundamentals:
     last_earnings: date | None = None  # Finviz, while the next date is not announced yet
     last_earnings_amc: bool | None = None  # reported after the close: reaction the next session
     sources: dict[str, str] = field(default_factory=dict)  # field name -> "Finviz" | "Yahoo"
-    note: str = ""  # why Finviz data is missing
+    note: str = ""  # why Finviz or Yahoo data is missing (fetch error)
     fetched: date | None = None  # when this snapshot was taken (prices have their own date)
     roic_pct: float | None = None  # Finviz "ROIC"; quality only, never a criterion
     operating_income: list[float | None] = field(default_factory=list)  # quarterly (Yahoo)

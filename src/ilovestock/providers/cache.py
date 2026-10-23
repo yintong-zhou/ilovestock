@@ -62,6 +62,6 @@ class CachedProvider:
             except (ValueError, KeyError, TypeError):  # corrupt or older format: refetch
                 pass
         f = self.inner.fundamentals(ticker)
-        if not f.note:  # a failed Finviz fetch (e.g. 429) is retried, not kept for the day
+        if not f.note:  # a failed fetch (e.g. Finviz 429) is retried, not kept for the day
             _replace(path, lambda p: p.write_text(json.dumps(dataclasses.asdict(f), default=str)))
         return f
