@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { Button, Field, inputClass, Message, PageHeader, Panel } from '../components'
-import { pct, points, rowClick } from '../format'
+import { download, pct, points, rowClick } from '../format'
 import type { ScreenHit, ScreenOut } from '../types'
 
 const MAX_RESULTS = 50 // the list goes to Analysis, which takes at most 50 tickers
@@ -30,12 +30,7 @@ function Note({ hit, n }: { hit: ScreenHit; n: number }) {
 function downloadWatchlist(out: ScreenOut) {
   const header = `# ilovestock screen ${out.screened_on}: top ${out.hits.length} of ${out.passed} by quality score. ${out.disclaimer}`
   const text = [header, ...out.hits.map((h) => h.ticker)].join('\n') + '\n'
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `screen-${out.screened_on}.txt`
-  a.click()
-  URL.revokeObjectURL(url)
+  download(new Blob([text], { type: 'text/plain' }), `screen-${out.screened_on}.txt`)
 }
 
 export default function Screener({

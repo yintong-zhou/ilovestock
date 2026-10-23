@@ -183,6 +183,20 @@ def test_history_api(client):
     assert client.get("/api/history").json() == []
 
 
+def test_history_pdf(client):
+    body = {"title": "History", "ids": ["x"]}
+    assert client.post("/api/history/pdf", json=body).status_code == 401  # locked
+    unlocked(client)
+    client.post("/api/analyze", json={"tickers": ["HZO"]})
+    rid = client.get("/api/history").json()[0]["id"]
+    r = client.post("/api/history/pdf", json={"title": "History", "ids": ["nope", rid]})
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+    assert r.content.startswith(b"%PDF")
+    assert client.post("/api/history/pdf", json=body).status_code == 404  # no id matches
+    assert client.post("/api/history/pdf", json={"title": "History", "ids": []}).status_code == 422
+    assert client.post("/api/history/pdf", json={"title": "Other", "ids": [rid]}).status_code == 422
+
+
 def test_watchlist_api(client, tmp_path, monkeypatch):
     assert client.get("/api/watchlist").status_code == 401  # locked
     unlocked(client)

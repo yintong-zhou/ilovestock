@@ -37,7 +37,7 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 - **Earnings check.** No entry when the next earnings report is 10 days away or less, nor before the market has reacted to the last one.
 - **Technical confirmations.** Relative strength vs the S&P 500, Donchian breakout on the weekly close after a consolidation, with volume, DMI/ADX and SMA 200, all with fixed parameters.
 - **Trade plan.** Entry, technical stop, take profit in R multiples, and position sizing capped by maximum exposure.
-- **Report files.** Markdown, CSV and JSON export, each with data date, sources and disclaimer.
+- **Report files.** Markdown, CSV and JSON export, each with data date, sources and disclaimer. In the web app, History and Watchlist download as PDF.
 - **Fundamentals-first screener.** Finds the US-listed stocks that pass every fundamental rule and ranks them by quality, ready for the full analysis.
 - **Flexible input.** Tickers on the command line, a watchlist file and a Finviz screener URL can be combined; duplicates are removed.
 - **Layered config.** Built-in defaults, then a TOML file, then CLI options.
@@ -156,6 +156,8 @@ Every file states the data date, the data sources and the disclaimer.
 Every analysis, from the terminal or the web app, adds one row per ticker to `~/.config/ilovestock/history.csv`: date, data date, verdict, price, entry, stop, target, shares, reasons, and every criterion with its status and value (as JSON, since criterion names can change). Tickers with a data error are not saved. The file opens in Excel.
 
 In the web app, the **History** page lists the analyzed tickers and, for each one, every analysis with what changed from the previous one (verdict, criteria, price). There you can add a note, edit verdict, price and levels (the analysis is then marked *edited*), and delete one analysis or a ticker's whole history.
+
+**Download PDF** on the History page (the tickers of the active filter, every page) and on the Watchlist page builds a PDF from the saved analyses, with no new download: a summary table, then one page per ticker with every criterion (value, threshold, status, note), the trade plan, the reasons and your note. Every page carries the disclaimer. Watchlist tickers never analyzed are left out. The PDF uses the standard Helvetica font, so characters outside Latin-1 become an ASCII stand-in (`→` becomes `->`) or `?`.
 
 ### Configuration
 
@@ -311,6 +313,7 @@ src/ilovestock/
   providers/      yfinance, Finviz adapter, disk cache
   report.py       Rich terminal output
   export.py       Markdown, CSV and JSON report files
+  pdf.py          PDF of saved analyses (History and Watchlist pages)
   api/            FastAPI app and PIN gate for the web app
 tests/            offline tests and recorded fixtures
 web/              React frontend

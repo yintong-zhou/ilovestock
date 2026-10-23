@@ -2,7 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { Button, CriteriaTable, Field, inputClass, Message, PageHeader, Panel, RuleGroup, StatusText, VerdictBadge, WatchButton } from '../components'
-import { fmt, groups, toHistory, when } from '../format'
+import { download, fmt, groups, today, toHistory, when } from '../format'
 import type { CriterionResult, HistoryEdit, HistoryRow, Status, Verdict } from '../types'
 
 const VERDICTS: Verdict[] = ['BUY', 'BUY*', 'NO-BUY']
@@ -28,7 +28,12 @@ function keep(filter: Filter, f: boolean, t: boolean) {
   return { 'All tickers': true, 'Fundamentals all PASS': f, 'Technical all PASS': t, Both: f && t }[filter]
 }
 
-function TickerList({ rows, view, onView }: { rows: HistoryRow[]; view: View; onView: (v: View) => void }) {
+function TickerList({ rows, view, onView, onPdf }: {
+  rows: HistoryRow[]
+  view: View
+  onView: (v: View) => void
+  onPdf: (ids: string[]) => void
+}) {
   const tickers = [...byTicker(rows)]
     .map(([ticker, list]) => ({ ticker, last: list.at(-1)!, count: list.length, ...groups(list.at(-1)!.criteria) }))
     .sort((a, b) => b.last.analyzed_at.localeCompare(a.last.analyzed_at))
@@ -57,6 +62,9 @@ function TickerList({ rows, view, onView }: { rows: HistoryRow[]; view: View; on
             {PAGE_SIZES.map((n) => <option key={n}>{n}</option>)}
           </select>
         </label>
+        <Button type="button" variant="quiet" disabled={shown.length === 0} onClick={() => onPdf(shown.map((t) => t.last.id))}>
+          Download PDF
+        </Button>
       </div>
       {shown.length === 0 ? (
         <p className="text-muted">
@@ -276,6 +284,16 @@ export default function History({ ticker, onApiError }: { ticker: string; onApiE
 
   useEffect(load, [load])
 
+  async function pdf(ids: string[]) {
+    setError('')
+    try {
+      download(await api.historyPdf('History', ids), `ilovestock-history-${today()}.pdf`)
+    } catch (err) {
+      setError((err as Error).message)
+      onApiError(err)
+    }
+  }
+
   async function act(action: () => Promise<unknown>) {
     setError('')
     try {
@@ -305,7 +323,7 @@ export default function History({ ticker, onApiError }: { ticker: string; onApiE
       {error && <Message kind="error">{error}</Message>}
       {rows === null ? null : !ticker ? (
         rows.length ? (
-          <TickerList rows={rows} view={view} onView={setView} />
+          <TickerList rows={rows} view={view} onView={setView} onPdf={pdf} />
         ) : (
           <Panel>
             <p className="text-muted">No analyses yet. Run one from <a href="#analysis" className="text-teal-tint hover:underline">Analysis</a> and it appears here.</p>

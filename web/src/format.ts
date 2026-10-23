@@ -20,6 +20,19 @@ export const toHistory = (ticker: string) =>
 /** '2026-10-20T15:04:00' -> '2026-10-20 15:04' */
 export const when = (iso: string) => iso.replace('T', ' ').slice(0, 16)
 
+/** Today's local date as YYYY-MM-DD, for file names (the Swedish locale writes ISO dates). */
+export const today = () => new Date().toLocaleDateString('sv')
+
+/** Saves a file built in the page or received from the API. */
+export function download(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 /** history.py saves fundamentals, Next earnings, technical; like Analysis, Next earnings counts as fundamental. */
 export function groups(criteria: CriterionResult[]) {
   const i = criteria.findIndex((c) => c.name === 'Next earnings') + 1

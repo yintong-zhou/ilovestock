@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { Button, Message, PageHeader, Panel, RuleGroup, VerdictBadge } from '../components'
-import { fmt, groups, latestByTicker, toHistory, when } from '../format'
+import { download, fmt, groups, latestByTicker, today, toHistory, when } from '../format'
 import type { HistoryRow } from '../types'
 
 const MAX = 50 // watchlist.MAX on the server
@@ -60,6 +60,18 @@ export default function Watchlist({ onApiError }: { onApiError: (e: unknown) => 
     }
   }
 
+  // Tickers never analyzed have nothing saved: they are left out of the PDF.
+  const ids = (tickers ?? []).flatMap((t) => latest.get(t)?.id ?? [])
+
+  async function pdf() {
+    setError('')
+    try {
+      download(await api.historyPdf('Watchlist', ids), `ilovestock-watchlist-${today()}.pdf`)
+    } catch (e) {
+      fail(e)
+    }
+  }
+
   const link = 'text-teal-tint hover:underline'
   return (
     <>
@@ -76,6 +88,11 @@ export default function Watchlist({ onApiError }: { onApiError: (e: unknown) => 
         </Panel>
       ) : (
         <Panel>
+          <div className="mb-4 flex justify-end">
+            <Button type="button" variant="quiet" disabled={ids.length === 0} onClick={pdf}>
+              Download PDF
+            </Button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="text-muted">

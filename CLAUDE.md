@@ -96,6 +96,8 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
   watchlist, one ticker per line, readable by `analyze --watchlist`) and `web_pin.json`
   (hashed PIN).
 - Reports go to `reports/`.
+- `pdf.py` renders History/Watchlist PDFs from history rows (`POST /api/history/pdf` with the
+  ids shown on the page). Core Helvetica font: text outside Latin-1 is replaced, not embedded.
 
 **Web.**
 

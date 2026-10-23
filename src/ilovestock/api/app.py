@@ -8,7 +8,7 @@ import dataclasses
 import threading
 from datetime import date, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ilovestock import config as cfgmod
-from ilovestock import history, inputs, screener, watchlist
+from ilovestock import history, inputs, pdf, screener, watchlist
 from ilovestock.analysis import analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
 from ilovestock.export import SOURCES, data_date
@@ -67,6 +67,11 @@ class AnalyzeOut(BaseModel):
 class ScreenIn(BaseModel):
     max: int = Field(screener.DEFAULT_RESULTS, ge=1, le=screener.MAX_RESULTS)
     include_large: bool = False
+
+
+class PdfIn(BaseModel):
+    title: Literal["History", "Watchlist"]
+    ids: list[str] = Field(min_length=1, max_length=1000)  # the analyses shown on the page
 
 
 class ScreenOut(BaseModel):
@@ -253,6 +258,14 @@ def create_app(
     @app.delete("/api/history", status_code=204, dependencies=[Depends(session)])
     def history_delete_ticker(ticker: str) -> None:
         history.delete(history_path, ticker=ticker.upper())
+
+    @app.post("/api/history/pdf", dependencies=[Depends(session)])
+    def history_pdf(body: PdfIn) -> Response:
+        by_id = {r["id"]: r for r in history.read(history_path)}
+        rows = [by_id[i] for i in body.ids if i in by_id]
+        if not rows:
+            raise HTTPException(404, "No saved analysis matches")
+        return Response(pdf.render(rows, body.title, datetime.now()), media_type="application/pdf")
 
     # Each route returns the whole list: the page shows exactly what is on disk.
     @app.get("/api/watchlist", dependencies=[Depends(session)])

@@ -8,7 +8,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const res = await fetch(path, {
     method,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -24,6 +24,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     }
     throw new ApiError(res.status, message)
   }
+  return res
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, body)
   return (res.status === 204 ? undefined : await res.json()) as T
 }
 
@@ -44,6 +49,8 @@ export const api = {
   deleteHistory: (id: string) => request<void>('DELETE', `/api/history/${encodeURIComponent(id)}`),
   deleteTickerHistory: (ticker: string) =>
     request<void>('DELETE', `/api/history?ticker=${encodeURIComponent(ticker)}`),
+  historyPdf: (title: 'History' | 'Watchlist', ids: string[]) =>
+    send('POST', '/api/history/pdf', { title, ids }).then((r) => r.blob()),
   watchlist: () => request<string[]>('GET', '/api/watchlist'),
   watch: (ticker: string) => request<string[]>('PUT', `/api/watchlist/${encodeURIComponent(ticker)}`),
   unwatch: (ticker: string) => request<string[]>('DELETE', `/api/watchlist/${encodeURIComponent(ticker)}`),
