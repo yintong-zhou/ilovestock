@@ -4,6 +4,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
+from ilovestock.models import Fundamentals
 from ilovestock.providers import finviz
 from ilovestock.providers.cache import CachedProvider, session_tag
 from ilovestock.providers.yahoo import YahooProvider, drop_partial_bar, session_end
@@ -281,3 +282,48 @@ def test_cache_loads_old_format_without_new_fields(tmp_path):
     (tmp_path / f"{date.today():%Y-%m-%d}_OLD_fundamentals.json").write_text(json.dumps(old))
     f = CachedProvider(inner=None, cache_dir=tmp_path).fundamentals("OLD")
     assert f.roic_pct is None and f.operating_income == []
+
+
+def test_cache_skips_failed_finviz_snapshot(tmp_path):
+    class Failing:
+        calls = 0
+
+        def fundamentals(self, t):
+            self.calls += 1
+            return Fundamentals([], [], None, None, None, note="Finviz error: 429")
+
+    inner = Failing()
+    p = CachedProvider(inner, tmp_path)
+    p.fundamentals("HZO"), p.fundamentals("HZO")
+    assert inner.calls == 2 and not list(tmp_path.glob("*.json"))
+
+
+def test_finviz_page_refetched_each_call(fake_yf, monkeypatch):
+    monkeypatch.setattr(finviz.finviz.main_func, "STOCK_PAGE", {})
+    pages = iter([{"ROE": "1%"}, {"ROE": "2%"}])
+
+    def lib_get_stock(t):  # like the lib: downloads only if the ticker is not cached yet
+        cache = finviz.finviz.main_func.STOCK_PAGE
+        if t not in cache:
+            cache[t] = next(pages)
+        return cache[t]
+
+    monkeypatch.setattr(finviz.finviz, "get_stock", lib_get_stock)
+    p = finviz.FinvizProvider(YahooProvider(), TODAY)
+    assert [p.fundamentals("HZO").roe_pct for _ in range(2)] == [1.0, 2.0]
+    assert finviz.finviz.main_func.STOCK_PAGE == {}
+
+
+def test_finviz_fetch_date_follows_the_clock(fake_yf, fake_finviz, monkeypatch):
+    class Clock(date):
+        day = date(2026, 10, 20)
+
+        @classmethod
+        def today(cls):
+            return cls.day
+
+    monkeypatch.setattr(finviz, "date", Clock)
+    p = finviz.FinvizProvider(YahooProvider())  # long-lived, as in `serve`
+    assert p.fundamentals("HZO").fetched == date(2026, 10, 20)
+    Clock.day = date(2026, 10, 21)
+    assert p.fundamentals("HZO").fetched == date(2026, 10, 21)

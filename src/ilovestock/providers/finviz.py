@@ -104,7 +104,12 @@ class FinvizProvider:
 
     def __init__(self, fallback: MarketDataProvider, today: date | None = None):
         self.fallback = fallback
-        self.today = today or date.today()
+        self._today = today
+
+    @property
+    def today(self) -> date:
+        """Read per call: `serve` keeps one provider alive across days."""
+        return self._today or date.today()
 
     def history(self, ticker: str) -> pd.DataFrame:
         return self.fallback.history(ticker)
@@ -119,14 +124,17 @@ class FinvizProvider:
             for k in ("roe_pct", "market_cap", "next_earnings", "inst_own_pct")
             if getattr(base, k) is not None
         }
+        today = self.today
         try:
-            fv = parse_snapshot(finviz.get_stock(ticker), self.today)
+            fv = parse_snapshot(finviz.get_stock(ticker), today)
             note = ""
         except Exception as e:  # scraping: any site change surfaces here
             fv, note = {}, f"Finviz error: {e}"
+        finally:  # the lib caches pages forever: drop it so the next call refetches
+            finviz.main_func.STOCK_PAGE.pop(ticker, None)
         found = {k: v for k, v in fv.items() if v is not None}
         sources.update(dict.fromkeys(found, "Finviz"))
-        return dataclasses.replace(base, **found, sources=sources, note=note, fetched=self.today)
+        return dataclasses.replace(base, **found, sources=sources, note=note, fetched=today)
 
 
 def parse_screener_page(html: str) -> tuple[list[str], int]:
