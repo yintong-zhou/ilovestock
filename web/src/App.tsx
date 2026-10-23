@@ -58,12 +58,12 @@ export default function App() {
   )
 
   const runScreen = useCallback(
-    async (max: number) => {
+    async (max: number, includeLarge: boolean) => {
       const session = locks.current
       setScreening(true)
       setScreenError('')
       try {
-        const out = await api.screen(max)
+        const out = await api.screen(max, includeLarge)
         if (session === locks.current) setLastScreen(out)
       } catch (e) {
         if (session === locks.current) setScreenError((e as Error).message)

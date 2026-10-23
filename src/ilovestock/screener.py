@@ -29,6 +29,7 @@ GROWTH_OVER = (5, 10, 15, 20, 25, 30)
 ROE_OVER = (5, 10, 15, 20, 25, 30, 35, 40, 45, 50)
 INST_OWN_UNDER = (10, 20, 30, 40, 50, 60, 70, 80, 90)
 ALLOWED_BANDS = ("micro", "small", "mid")  # same as the Market cap rule
+LARGE_BANDS = ("large", "giant")  # opt-in: the screen then skips the Market cap rule
 
 
 def _over(levels, minimum: float) -> int | None:
@@ -55,12 +56,14 @@ def screener_url(cfg: Config) -> str:
     return SCREENER_URL + ",".join(finviz_filters(cfg)) + BY_CAP_DESC
 
 
-def candidates(cfg: Config) -> list[str]:
+def candidates(cfg: Config, include_large: bool = False) -> list[str]:
     """Pre-filter tickers in the micro/small/mid bands of the config, read by market cap descending:
-    large and giant are skipped, the first nano ends the list (no more pages are fetched).
+    large and giant are skipped unless `include_large`, the first nano ends the list (no more
+    pages are fetched).
 
     A row with no Finviz market cap is skipped, like any other missing filtered value.
     """
+    bands = ALLOWED_BANDS + LARGE_BANDS if include_large else ALLOWED_BANDS
     tickers = []
     for i, (t, cap) in enumerate(finviz.screener_rows(screener_url(cfg)), 1):
         if i > MAX_ROWS:
@@ -73,12 +76,12 @@ def candidates(cfg: Config) -> list[str]:
         band = market_cap_band(cap, cfg)
         if band == "nano":
             break
-        if band in ALLOWED_BANDS:
+        if band in bands:
             tickers.append(t)
         if len(tickers) > MAX_CANDIDATES:
             yoy = '; growth_basis = "yoy" also filters growth on Finviz'
             raise finviz.FinvizError(
-                f"more than {MAX_CANDIDATES} micro/small/mid candidates from Finviz. "
+                f"more than {MAX_CANDIDATES} {'/'.join(bands)} candidates from Finviz. "
                 "Tighten the fundamental thresholds in the config"
                 + (yoy if cfg.growth_basis == "qoq" else "")
             )
@@ -109,8 +112,11 @@ def screen(
     today: date,
     max_results: int = DEFAULT_RESULTS,
     progress: Callable[[str], None] | None = None,
+    include_large: bool = False,
 ) -> ScreenResult:
-    tickers = candidates(cfg)
+    """With `include_large`, large and giant caps are searched and the Market cap rule is skipped:
+    `analyze` still fails them on it (user's decision)."""
+    tickers = candidates(cfg, include_large)
     passed: list[tuple[str, str | None, Quality]] = []
     errors = []
     for t in tickers:
@@ -127,7 +133,8 @@ def screen(
         except Exception:  # unofficial sources: skip the ticker, keep the search going
             errors.append(t)
             continue
-        if all(c.status == Status.PASS for c in [*fund_results, earn]):
+        checked = [c for c in fund_results if not (include_large and c.name == "Market cap")]
+        if all(c.status == Status.PASS for c in [*checked, earn]):
             cap = next((c.value for c in fund_results if c.name == "Market cap"), None)
             passed.append((t, cap, q))
     qs = [q for _, _, q in passed]

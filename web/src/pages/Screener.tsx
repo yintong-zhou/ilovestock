@@ -47,16 +47,17 @@ export default function Screener({
   result: ScreenOut | null
   busy: boolean // busy and error are owned by App: both survive leaving this page mid-search
   error: string
-  onSearch: (max: number) => Promise<void>
+  onSearch: (max: number, includeLarge: boolean) => Promise<void>
 }) {
   const [max, setMax] = useState(20)
+  const [includeLarge, setIncludeLarge] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   const valid = Number.isInteger(max) && max >= 1 && max <= MAX_RESULTS
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setOpen(null)
-    await onSearch(max)
+    await onSearch(max, includeLarge)
   }
 
   function analyzeAll(out: ScreenOut) {
@@ -71,22 +72,29 @@ export default function Screener({
       </PageHeader>
 
       <Panel>
-        <form onSubmit={submit} className="flex flex-wrap items-end gap-4">
-          <div className="w-40">
-            <Field label="Max results" hint={`1 to ${MAX_RESULTS}`}>
-              <input
-                type="number"
-                min={1}
-                max={MAX_RESULTS}
-                className={inputClass}
-                value={Number.isNaN(max) ? '' : max}
-                onChange={(e) => setMax(e.target.valueAsNumber)}
-              />
-            </Field>
+        <form onSubmit={submit} className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="w-40">
+              <Field label="Max results" hint={`1 to ${MAX_RESULTS}`}>
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_RESULTS}
+                  className={inputClass}
+                  value={Number.isNaN(max) ? '' : max}
+                  onChange={(e) => setMax(e.target.valueAsNumber)}
+                />
+              </Field>
+            </div>
+            <Button type="submit" className="mb-7" disabled={busy || !valid}>
+              {busy ? 'Searching…' : 'Search'}
+            </Button>
           </div>
-          <Button type="submit" className="mb-7" disabled={busy || !valid}>
-            {busy ? 'Searching…' : 'Search'}
-          </Button>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4 accent-teal" checked={includeLarge}
+              onChange={(e) => setIncludeLarge(e.target.checked)} />
+            Include large and giant caps: the Market cap rule is skipped, Analysis still fails them on it
+          </label>
         </form>
         {busy && <Message kind="info">Checking each candidate takes a few seconds (up to 100 candidates).</Message>}
         {error && <Message kind="error">{error}</Message>}
@@ -94,7 +102,7 @@ export default function Screener({
 
       {result && (
         <Panel
-          title={`${result.passed} stocks pass every fundamental rule · showing the top ${result.hits.length} by quality score`}
+          title={`${result.passed} stocks pass every fundamental rule${result.include_large ? ' except Market cap' : ''} · showing the top ${result.hits.length} by quality score`}
           aside={`${result.candidates} candidates from Finviz`}
         >
           {result.hits.length === 0 ? (

@@ -105,6 +105,22 @@ def test_candidates_are_micro_to_mid_by_cap(monkeypatch):
     assert r.candidates == 2 and sorted(h.ticker for h in r.hits) == ["MIC", "MID"]
 
 
+def test_include_large_skips_only_the_market_cap_rule(monkeypatch):
+    def rows(url):
+        yield from [("GNT", 300e9), ("LRG", 10e9), ("MID", 9.99e9), ("NNO", 49.9e6)]
+        raise AssertionError("read past the first nano")
+
+    monkeypatch.setattr(finviz, "screener_rows", rows)
+    data = {
+        "GNT": good_fundamentals(market_cap=300e9),
+        "LRG": good_fundamentals(market_cap=10e9, roe_pct=10.0),  # fails ROE: still out
+        "MID": good_fundamentals(market_cap=9.99e9),
+    }
+    r = screen(FakeProvider(data), CFG, TODAY, include_large=True)
+    assert (r.candidates, sorted(h.ticker for h in r.hits)) == (3, ["GNT", "MID"])
+    assert next(h for h in r.hits if h.ticker == "GNT").market_cap == "300,000M (giant)"
+
+
 def test_candidates_bound_the_rows_read(monkeypatch):
     # large/giant rows are fetched but skipped: they need their own cap on Finviz requests
     giants = ((f"G{i}", 1e12 - i) for i in itertools.count())

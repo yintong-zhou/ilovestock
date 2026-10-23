@@ -78,6 +78,7 @@ ilovestock --help
 ```bash
 ilovestock screen            # top 20
 ilovestock screen --max 10   # 1 to 50
+ilovestock screen --include-large   # also large and giant caps
 ```
 
 The screener builds a Finviz screener query from your config thresholds, then checks every candidate with the same fundamental and earnings rules as `analyze`. A stock is listed only if every one of those criteria is `PASS`. The stocks that pass are ranked by a **quality score**, because sales growth alone says nothing about profit:
@@ -95,6 +96,7 @@ ilovestock analyze --watchlist reports/screen-2026-10-22.txt
 
 - Only stocks with complete Finviz data are searched: a stock with a missing Finviz value on a filtered field (or no Finviz market cap) never reaches the candidates, even if Yahoo has it.
 - Dividends and market cap are not filtered on Finviz: its dividend filter uses the forward estimate (the rule uses the last 12 months) and its market cap filter takes a single band. Finviz rows come sorted by market cap instead: large and giant caps are skipped, and the list ends at the first nano cap, with the same bands as the rule.
+- `--include-large` (web: the "Include large and giant caps" box) also searches large and giant caps and skips the Market cap rule, so they can pass. The method is for micro to mid caps: `analyze` still fails them on Market cap, so their verdict stays NO-BUY.
 - A search stops with more than 100 micro/small/mid candidates, or more than 1000 Finviz rows before the first nano cap: tighten the thresholds in the config. Each candidate takes a few seconds. An unreadable Finviz page (changed markup) stops the search with an error, never with a partial list.
 - With `growth_basis = "qoq"`, growth is not filtered on Finviz (it only has year-on-year), so more candidates come back.
 

@@ -134,6 +134,13 @@ def screen(
         Path | None, typer.Option(help="Watchlist file (default: reports/screen-DATE.txt)")
     ] = None,
     config_file: Annotated[Path | None, typer.Option("--config", help="Config file")] = None,
+    include_large: Annotated[
+        bool,
+        typer.Option(
+            help="Also search large and giant caps: the Market cap rule is skipped, "
+            "analyze still fails them on it"
+        ),
+    ] = False,
 ) -> None:
     """Find US-listed stocks that pass every fundamental rule, ranked by quality (ROIC and
     operating margin change). Only stocks with complete Finviz data are searched."""
@@ -148,7 +155,12 @@ def screen(
     with console.status("Searching Finviz...") as status:
         try:
             result = screener.screen(
-                provider, cfg, today, max_results, lambda t: status.update(f"Checking {t}...")
+                provider,
+                cfg,
+                today,
+                max_results,
+                lambda t: status.update(f"Checking {t}..."),
+                include_large,
             )
         except finviz.FinvizError as e:
             _fail(str(e))
@@ -156,7 +168,8 @@ def screen(
             _fail(f"Finviz screener failed: {e}")
     console.print(
         f"{result.candidates} candidates from Finviz, {result.passed} pass every fundamental"
-        f" rule, showing {len(result.hits)} by quality score"
+        f" rule{' except Market cap' if include_large else ''},"
+        f" showing {len(result.hits)} by quality score"
     )
     if result.errors:
         console.print(f"[dim]Skipped for data errors: {', '.join(result.errors)}[/]")

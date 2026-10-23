@@ -239,6 +239,20 @@ def test_screen_serializes_hits(client, monkeypatch):
     assert body["hits"][0]["roic_rank"] == 2
 
 
+def test_screen_include_large(client, monkeypatch):
+    unlocked(client)
+    seen = {}
+
+    def fake(*a, **k):
+        seen.update(k)
+        return screener.ScreenResult(0, 0, [], [])
+
+    monkeypatch.setattr(screener, "screen", fake)
+    body = client.post("/api/screen", json={"include_large": True}).json()
+    assert seen["include_large"] is True and body["include_large"] is True
+    assert client.post("/api/screen", json={}).json()["include_large"] is False
+
+
 def test_screen_too_many_is_422(client, monkeypatch):
     unlocked(client)
 

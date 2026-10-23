@@ -72,6 +72,7 @@ export interface ScreenOut {
   disclaimer: string
   finviz_warning: string
   screened_on: string
+  include_large: boolean // the Market cap rule was skipped
   candidates: number
   passed: number
   errors: string[]

@@ -66,12 +66,14 @@ class AnalyzeOut(BaseModel):
 
 class ScreenIn(BaseModel):
     max: int = Field(screener.DEFAULT_RESULTS, ge=1, le=screener.MAX_RESULTS)
+    include_large: bool = False
 
 
 class ScreenOut(BaseModel):
     disclaimer: str
     finviz_warning: str
     screened_on: str
+    include_large: bool  # the Market cap rule was skipped
     candidates: int
     passed: int
     errors: list[str]
@@ -209,7 +211,13 @@ def create_app(
     def screen(body: ScreenIn) -> ScreenOut:
         today = date.today()
         try:  # ponytail: synchronous like /api/analyze; MAX_CANDIDATES bounds it to minutes
-            result = screener.screen(provider, cfgmod.load(cfg_path), today, body.max)
+            result = screener.screen(
+                provider,
+                cfgmod.load(cfg_path),
+                today,
+                body.max,
+                include_large=body.include_large,
+            )
         except (cfgmod.ConfigError, finviz.FinvizError) as e:
             raise HTTPException(422, str(e)) from e
         except Exception as e:
@@ -218,6 +226,7 @@ def create_app(
             disclaimer=DISCLAIMER,
             finviz_warning=finviz.WARNING,
             screened_on=today.isoformat(),
+            include_large=body.include_large,
             **vars(result),
         )
 
