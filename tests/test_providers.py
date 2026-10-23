@@ -7,6 +7,7 @@ import pytest
 
 from ilovestock.models import Fundamentals
 from ilovestock.providers import finviz
+from ilovestock.providers.base import HISTORY_PERIOD
 from ilovestock.providers.cache import CachedProvider, session_tag
 from ilovestock.providers.yahoo import YahooProvider, drop_partial_bar, session_end
 from tests.conftest import FIX, FakeTicker, raw_history
@@ -65,9 +66,9 @@ def test_cache_roundtrip(fake_yf, tmp_path):
     class Counting(YahooProvider):
         calls = 0
 
-        def history(self, t):
+        def history(self, t, period=HISTORY_PERIOD):
             Counting.calls += 1
-            return super().history(t)
+            return super().history(t, period)
 
         def fundamentals(self, t):
             Counting.calls += 1
@@ -79,6 +80,19 @@ def test_cache_roundtrip(fake_yf, tmp_path):
     assert Counting.calls == 2
     pd.testing.assert_frame_equal(h1, h2, check_freq=False)
     assert f1 == f2
+
+
+def test_cache_keeps_each_history_period_apart(fake_yf, tmp_path):
+    periods = []
+
+    class Recording(YahooProvider):
+        def history(self, t, period=HISTORY_PERIOD):
+            periods.append(period)
+            return super().history(t, period)
+
+    p = CachedProvider(Recording(), tmp_path)
+    p.history("HZO", "1y"), p.history("HZO"), p.history("HZO", "1y")
+    assert periods == ["1y", "2y"]  # the screen's 1 year never stands in for analyze's 2
 
 
 def test_finviz_pct():
@@ -192,6 +206,7 @@ def test_parse_screener_rows_reads_market_cap():
         (FIX / "finviz_screener_default.html").read_text(encoding="utf-8")
     )
     assert len(rows) == 20 and rows[0][0] == "AFRM" and rows[0][1] == pytest.approx(24.52e9)
+    assert finviz.first_row_number(P1) == 1 and finviz.first_row_number("<html></html>") is None
 
 
 def fake_pages(monkeypatch, pages: dict[int, str]) -> list[int]:
@@ -215,16 +230,46 @@ def fake_pages(monkeypatch, pages: dict[int, str]) -> list[int]:
 
 SORTED_URL = "https://finviz.com/screener.ashx?v=111&o=-marketcap"
 P1 = (FIX / "finviz_screener_p1.html").read_text(encoding="utf-8")  # 261 results
-P2 = (FIX / "finviz_screener_p2.html").read_text(encoding="utf-8")
 
 
-def test_screener_rows_page_lazily(monkeypatch):
-    calls = fake_pages(monkeypatch, {1: P1, 21: P2})
+def cap_page(first: int, total: int, rows: list[tuple[str, str]]) -> str:
+    """Screener page in Finviz's markup (as in the fixtures), rows numbered from `first`.
+
+    The recorded pages are sorted by ticker, so sorted-by-cap pages are built here.
+    """
+    return f"#{first} / {total} Total" + "".join(
+        f'<div data-row-key="{t}"><div data-column-id="row">{first + i}</div>'
+        f'<a href="/quote?t={t}&amp;b=1"></a><div data-column-id="marketCap">{cap}</div></div>'
+        for i, (t, cap) in enumerate(rows)
+    )
+
+
+def test_screener_rows_overlap_pages_so_a_rising_stock_is_not_skipped(monkeypatch):
+    caps = {f"S{i:02d}": f"{100 - i}.00B" for i in range(1, 31)}  # 30 results, cap descending
+    names = list(caps)
+    page1 = cap_page(1, 30, [(t, caps[t]) for t in names[:20]])
+    # before page 2 is read, S21 rises above S20: with pages of 20 it would sit on page 1, unseen
+    caps["S21"] = "80.50B"
+    page2 = cap_page(16, 30, [(t, caps[t]) for t in [*names[15:19], "S21", "S20", *names[21:]]])
+    calls = fake_pages(monkeypatch, {1: page1, 16: page2})
     rows = finviz.screener_rows(SORTED_URL)
-    assert [next(rows) for _ in range(21)][20][0] == "ARDX" and calls == [1, 21]
-    # page 3 of 261 results has no rows: a changed page, not the end of the list
-    with pytest.raises(finviz.FinvizError, match="no rows"):
-        list(rows)
+    assert [next(rows) for _ in range(20)][-1][0] == "S20" and calls == [1]  # fetched lazily
+    assert [t for t, _ in rows] == ["S21", *names[21:]] and calls == [1, 16]  # S16-S20 once
+
+
+def test_screener_rows_refuse_a_page_not_sorted_by_cap(monkeypatch):
+    # if Finviz ignored the sort, stopping at the first nano would drop valid stocks
+    fake_pages(monkeypatch, {1: cap_page(1, 2, [("A", "1.00B"), ("B", "2.00B")])})
+    with pytest.raises(finviz.FinvizError, match="not sorted by market cap"):
+        list(finviz.screener_rows(SORTED_URL))
+
+
+def test_screener_rows_refuse_a_page_starting_elsewhere(monkeypatch):
+    # overlapping pages rely on Finviz starting at the requested row (16, not a multiple of 20)
+    rows = [(f"S{i:02d}", f"{100 - i}.00B") for i in range(1, 31)]
+    fake_pages(monkeypatch, {1: cap_page(1, 30, rows[:20]), 16: cap_page(21, 30, rows[20:])})
+    with pytest.raises(finviz.FinvizError, match="starts at row 21, not 16"):
+        list(finviz.screener_rows(SORTED_URL))
 
 
 @pytest.mark.parametrize(

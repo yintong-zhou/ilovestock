@@ -41,29 +41,22 @@ function downloadWatchlist(out: ScreenOut) {
 export default function Screener({
   result,
   busy,
+  error,
   onSearch,
-  onApiError,
 }: {
   result: ScreenOut | null
-  busy: boolean // owned by App: survives leaving this page mid-search
+  busy: boolean // busy and error are owned by App: both survive leaving this page mid-search
+  error: string
   onSearch: (max: number) => Promise<void>
-  onApiError: (e: unknown) => void
 }) {
   const [max, setMax] = useState(20)
-  const [error, setError] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const valid = Number.isInteger(max) && max >= 1 && max <= MAX_RESULTS
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    try {
-      await onSearch(max)
-      setOpen(null)
-    } catch (err) {
-      setError((err as Error).message)
-      onApiError(err)
-    }
+    setOpen(null)
+    await onSearch(max)
   }
 
   function analyzeAll(out: ScreenOut) {

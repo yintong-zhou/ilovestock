@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from ilovestock.models import Fundamentals
-from ilovestock.providers.base import MarketDataProvider
+from ilovestock.providers.base import HISTORY_PERIOD, MarketDataProvider
 from ilovestock.providers.yahoo import MARKET_CLOSE_HOUR, MARKET_TZ
 
 DEFAULT_CACHE_DIR = Path.home() / ".cache" / "ilovestock"
@@ -42,11 +42,13 @@ class CachedProvider:
         self.dir.mkdir(parents=True, exist_ok=True)
         return self.dir / f"{tag or f'{date.today():%Y-%m-%d}'}_{ticker}_{kind}.{ext}"
 
-    def history(self, ticker: str) -> pd.DataFrame:
-        path = self._path(ticker, "history", "csv", session_tag(pd.Timestamp.now(tz=MARKET_TZ)))
+    def history(self, ticker: str, period: str = HISTORY_PERIOD) -> pd.DataFrame:
+        # own file per period: the screen's 1 year must never stand in for analyze's 2
+        kind = "history" if period == HISTORY_PERIOD else f"history{period}"
+        path = self._path(ticker, kind, "csv", session_tag(pd.Timestamp.now(tz=MARKET_TZ)))
         if path.exists():
             return pd.read_csv(path, index_col=0, parse_dates=True)
-        df = self.inner.history(ticker)
+        df = self.inner.history(ticker, period)
         _replace(path, df.to_csv)
         return df
 

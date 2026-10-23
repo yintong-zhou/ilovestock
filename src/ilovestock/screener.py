@@ -1,6 +1,5 @@
 """Fundamentals-first screener: loose Finviz pre-filter, then the exact rules of `analyze`."""
 
-import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -15,7 +14,8 @@ from ilovestock.quality import quality, ranks, scores
 from ilovestock.rules.fundamental import market_cap_band
 
 MAX_CANDIDATES = 100  # each candidate costs Finviz + Yahoo requests: ~5 minutes at most
-MAX_ROWS = 1000  # rows read before the first nano, large/giant included: 50 page requests at most
+MAX_ROWS = 1000  # rows read before the first nano, large/giant included: ~70 page requests at most
+SCREEN_PERIOD = "1y"  # its rules read prices only for the dividends paid in the last 365 days
 DEFAULT_RESULTS = 20
 MAX_RESULTS = inputs.MAX_TICKERS  # the list goes to `analyze`, which takes at most this many
 SCREENER_URL = "https://finviz.com/screener.ashx?v=111&f="
@@ -61,8 +61,7 @@ def candidates(cfg: Config) -> list[str]:
 
     A row with no Finviz market cap is skipped, like any other missing filtered value.
     """
-    tickers: dict[str, None] = {}
-    last = math.inf
+    tickers = []
     for i, (t, cap) in enumerate(finviz.screener_rows(screener_url(cfg)), 1):
         if i > MAX_ROWS:
             raise finviz.FinvizError(
@@ -71,14 +70,11 @@ def candidates(cfg: Config) -> list[str]:
             )
         if cap is None:
             continue
-        if cap > last:  # stopping at the first nano is only safe in this order
-            raise finviz.FinvizError("Finviz rows not sorted by market cap: page changed")
-        last = cap
         band = market_cap_band(cap, cfg)
         if band == "nano":
             break
         if band in ALLOWED_BANDS:
-            tickers[t] = None
+            tickers.append(t)
         if len(tickers) > MAX_CANDIDATES:
             yoy = '; growth_basis = "yoy" also filters growth on Finviz'
             raise finviz.FinvizError(
@@ -86,7 +82,7 @@ def candidates(cfg: Config) -> list[str]:
                 "Tighten the fundamental thresholds in the config"
                 + (yoy if cfg.growth_basis == "qoq" else "")
             )
-    return list(tickers)
+    return tickers
 
 
 @dataclass
@@ -121,14 +117,14 @@ def screen(
         if progress:
             progress(t)
         try:
-            daily = provider.history(t)
             fund = provider.fundamentals(t)
+            if fund.note:  # a source failed (e.g. Finviz 429): a fetch error, not a failed rule
+                errors.append(t)
+                continue
+            daily = provider.history(t, SCREEN_PERIOD)
             fund_results, earn = fundamental_checks(fund, daily, cfg, today)
             q = quality(fund)
         except Exception:  # unofficial sources: skip the ticker, keep the search going
-            errors.append(t)
-            continue
-        if fund.note:  # a source failed (e.g. Finviz 429): a fetch error, not a failed rule
             errors.append(t)
             continue
         if all(c.status == Status.PASS for c in [*fund_results, earn]):

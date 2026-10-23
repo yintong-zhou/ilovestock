@@ -68,6 +68,15 @@ Per questo i titoli si ordinano con un punteggio di qualità, non per crescita d
      e giant, si ferma alla prima nano e usa le fasce di `market_cap_band`, le stesse della
      regola. Se le righe non sono in ordine la ricerca si ferma con un errore, perché fermarsi
      alla prima nano sarebbe sbagliato.
+   - *Corretto dopo la code review del 2026-10-23:* tra una pagina e l'altra le capitalizzazioni
+     cambiano, e con pagine da 20 un titolo che sale di posto poteva essere saltato. Le pagine ora
+     si sovrappongono di 5 righe (`r` = 1, 16, 31, …), ogni ticker si legge una volta sola e
+     l'ordine si controlla dentro ogni pagina, non tra pagine. Se Finviz non parte dalla riga
+     richiesta, la ricerca si ferma con un errore.
+   - Per ogni candidato si scaricano prima i fondamentali: se il download fallisce non si
+     scaricano i prezzi. I prezzi coprono solo l'ultimo anno (`SCREEN_PERIOD`), perché nello
+     screener servono solo per i dividendi degli ultimi 365 giorni. Sono salvati in cache in un file
+     separato, così non prendono mai il posto dei 2 anni che servono ad `analyze`.
    - *Scelta di Claude, perdita accettata:* lo screener Finviz scarta i titoli che non hanno il
      dato filtrato. `analyze` invece, per crescita, ROE, proprietà istituzionale e market cap,
      ripiega su Yahoo. Un titolo con `-` su Finviz in uno di quei campi può quindi passare

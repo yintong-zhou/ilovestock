@@ -16,13 +16,14 @@ import pandas as pd
 import requests
 
 from ilovestock.models import Fundamentals
-from ilovestock.providers.base import MarketDataProvider
+from ilovestock.providers.base import HISTORY_PERIOD, MarketDataProvider
 
 WARNING = (
     "Finviz: unofficial source (scraping), use may violate Finviz ToS; quotes delayed 15-20 min."
 )
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 PAGE_SIZE = 20
+OVERLAP = 5  # rows read twice per page: a stock rising up to 5 places between requests is seen
 SUFFIX = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
 
 # Keys and formats verified on real get_stock() responses (tests/fixtures/*_finviz.json).
@@ -114,8 +115,8 @@ class FinvizProvider:
         """Read per call: `serve` keeps one provider alive across days."""
         return self._today or date.today()
 
-    def history(self, ticker: str) -> pd.DataFrame:
-        return self.fallback.history(ticker)
+    def history(self, ticker: str, period: str = HISTORY_PERIOD) -> pd.DataFrame:
+        return self.fallback.history(ticker, period)
 
     def fundamentals(self, ticker: str) -> Fundamentals:
         notes = []  # a non-empty note keeps the snapshot out of the cache and the screener
@@ -160,8 +161,19 @@ def parse_screener_rows(html: str) -> list[tuple[str, float | None]]:
     return [(t, _money(cap)) for t, cap in cells]
 
 
+def first_row_number(html: str) -> int | None:
+    """Position of a screener page's first row (the 'No.' column)."""
+    m = re.search(r'data-column-id="row"[^>]*>(\d+)<', html)
+    return int(m.group(1)) if m else None
+
+
 def screener_rows(url: str) -> Iterator[tuple[str, float | None]]:
-    """Rows of one of our screener URLs, page by page, fetched only as the caller reads them."""
+    """Rows of one of our screener URLs, sorted by market cap descending, each ticker once.
+
+    Pages are fetched only as the caller reads them. Caps move between two requests, so pages
+    overlap by OVERLAP rows and the order is checked within a page (one snapshot), not across.
+    """
+    seen: set[str] = set()
     row, total = 1, 1
     while row <= total:
         resp = requests.get(url, params={"r": row}, headers={"User-Agent": UA}, timeout=30)
@@ -172,8 +184,16 @@ def screener_rows(url: str) -> Iterator[tuple[str, float | None]]:
             raise FinvizError("no rows: no stock matches the filters, or the Finviz page changed")
         if len(rows) != len(tickers):  # a row the parser missed would be silently dropped
             raise FinvizError("screener page changed: rows not recognized")
-        yield from rows
-        row += PAGE_SIZE
+        if (first := first_row_number(resp.text)) != row:  # the overlap needs r as asked
+            raise FinvizError(f"screener page changed: page starts at row {first}, not {row}")
+        caps = [c for _, c in rows if c is not None]
+        if caps != sorted(caps, reverse=True):  # stopping at the first nano needs this order
+            raise FinvizError("Finviz rows not sorted by market cap: page changed")
+        for t, cap in rows:
+            if t not in seen:
+                seen.add(t)
+                yield t, cap
+        row += PAGE_SIZE - OVERLAP
 
 
 def screener_tickers(url: str, max_results: int | None = None) -> list[str]:

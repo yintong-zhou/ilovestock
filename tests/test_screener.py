@@ -72,6 +72,7 @@ def test_finviz_accepts_every_generated_filter():
 class FakeProvider:
     def __init__(self, data: dict[str, Fundamentals | Exception]):
         self.data = data
+        self.history_calls = []
 
     def _get(self, t):
         v = self.data[t]
@@ -79,7 +80,8 @@ class FakeProvider:
             raise v
         return v
 
-    def history(self, t):
+    def history(self, t, period="2y"):
+        self.history_calls.append((t, period))
         self._get(t)
         return prices()
 
@@ -94,7 +96,7 @@ def run(monkeypatch, data, **kw):
 
 def test_candidates_are_micro_to_mid_by_cap(monkeypatch):
     def rows(url):  # Finviz order: market cap descending
-        yield from [("GNT", 300e9), ("LRG", 10e9), ("MID", 9.99e9), ("MID", 9.99e9)]
+        yield from [("GNT", 300e9), ("LRG", 10e9), ("MID", 9.99e9)]
         yield from [("NOC", None), ("MIC", 50e6), ("NNO", 49.9e6)]  # 50M exactly is micro
         raise AssertionError("read past the first nano")
 
@@ -112,11 +114,13 @@ def test_candidates_bound_the_rows_read(monkeypatch):
     assert next(giants)[0] == "G1001"  # stopped right after the limit
 
 
-def test_candidates_refuse_an_ignored_sort(monkeypatch):
-    # without the sort, stopping at the first nano would silently drop valid stocks
-    monkeypatch.setattr(finviz, "screener_rows", lambda url: iter([("A", 1e9), ("B", 2e9)]))
-    with pytest.raises(finviz.FinvizError, match="not sorted by market cap"):
-        screen(FakeProvider({}), CFG, TODAY)
+def test_screen_reads_fundamentals_first_and_one_year_of_prices(monkeypatch):
+    # a failed fundamentals fetch costs no price download; the screen's rules need 1 year at most
+    p = FakeProvider({"A": good_fundamentals(), "B": good_fundamentals(note="Finviz error: 429")})
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: [("A", 1e9), ("B", 1e9)])
+    r = screen(p, CFG, TODAY)
+    assert (r.errors, [h.ticker for h in r.hits]) == (["B"], ["A"])
+    assert p.history_calls == [("A", "1y")]
 
 
 def test_screen_keeps_only_all_pass_and_counts(monkeypatch):
