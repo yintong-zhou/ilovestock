@@ -10,6 +10,17 @@ import pytest
 FIX = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def no_live_requests(request, monkeypatch):
+    """Live Finviz requests need the user's OK: outside `slow` tests a missed mock fails loudly."""
+    if request.node.get_closest_marker("slow") is None:
+
+        def blocked(*_, **__):
+            raise RuntimeError("live request in an offline test: mock it or mark the test slow")
+
+        monkeypatch.setattr("requests.Session.send", blocked)
+
+
 def raw_history(ticker: str) -> pd.DataFrame:
     df = pd.read_csv(FIX / f"{ticker}_history.csv", index_col=0)
     df.index = pd.to_datetime(df.index, utc=True).tz_convert("America/New_York")

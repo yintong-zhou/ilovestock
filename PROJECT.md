@@ -102,6 +102,7 @@ pyproject.toml  README.md  LICENSE (TBD)
 ## CLI
 ```
 ilovestock analyze [TICKER ...] [options]
+ilovestock screen [--max N] [--out FILE]   # fundamentals-first list, ranked by quality
 ilovestock config init     # write config with course defaults
 ilovestock config show     # effective config (file + overrides)
 ilovestock config path

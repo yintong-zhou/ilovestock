@@ -38,6 +38,7 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 - **Technical confirmations.** Relative strength vs the S&P 500, Donchian breakout on the weekly close after a consolidation, with volume, DMI/ADX and SMA 200, all with fixed parameters.
 - **Trade plan.** Entry, technical stop, take profit in R multiples, and position sizing capped by maximum exposure.
 - **Report files.** Markdown, CSV and JSON export, each with data date, sources and disclaimer.
+- **Fundamentals-first screener.** Finds the US-listed stocks that pass every fundamental rule and ranks them by quality, ready for the full analysis.
 - **Flexible input.** Tickers on the command line, a watchlist file and a Finviz screener URL can be combined; duplicates are removed.
 - **Layered config.** Course defaults, then a TOML file, then CLI options.
 
@@ -65,6 +66,31 @@ ilovestock --help
 ```
 
 ## Usage
+
+### Find candidates (fundamentals first)
+
+```bash
+ilovestock screen            # top 20
+ilovestock screen --max 10   # 1 to 50
+```
+
+The screener builds a Finviz screener query from your config thresholds, then checks every candidate with the same fundamental and earnings rules as `analyze`. A stock is listed only if every one of those criteria is `PASS`. The stocks that pass are ranked by a **quality score**, because sales growth alone says nothing about profit:
+
+- **ROIC**: operating profit per dollar invested in the business (Finviz).
+- **Operating margin change**: operating margin of the last quarter minus the same quarter a year earlier, in points (Yahoo). A falling margin means costs grow faster than sales.
+
+Each stock gets a rank on both measures within the stocks that passed. Each rank becomes a percentile, 0–100 (100 = best, 0 = worst of the group), and the score is the average of the two percentiles. The score never changes a verdict: `analyze --detail` shows ROIC and margin change as an informative `Quality` row.
+
+The list is saved as a watchlist (default `reports/screen-YYYY-MM-DD.txt`, change it with `--out`) and the command prints the next step:
+
+```bash
+ilovestock analyze --watchlist reports/screen-2026-10-22.txt
+```
+
+- Only stocks with complete Finviz data are searched: a stock with a missing Finviz value on a filtered field (or no Finviz market cap) never reaches the candidates, even if Yahoo has it.
+- Dividends and market cap are not filtered on Finviz: its dividend filter uses the forward estimate (the rule uses the last 12 months) and its market cap filter takes a single band. Finviz rows come sorted by market cap instead: large and giant caps are skipped, and the list ends at the first nano cap, with the same bands as the rule.
+- A search stops with more than 100 micro/small/mid candidates, or more than 1000 Finviz rows before the first nano cap: tighten the thresholds in the config. Each candidate takes a few seconds. An unreadable Finviz page (changed markup) stops the search with an error, never with a partial list.
+- With `growth_basis = "qoq"`, growth is not filtered on Finviz (it only has year-on-year), so more candidates come back.
 
 ### Analyze tickers
 
@@ -171,7 +197,7 @@ ilovestock serve                                   # http://127.0.0.1:3000 (or 3
 ```
 
 - **PIN.** The first `ilovestock serve` asks you to set a PIN (4 to 8 digits) in the terminal, never in the browser: no other program on this computer can claim the app first. It is stored hashed in `~/.config/ilovestock/web_pin.json`, never in clear. After 5 wrong attempts, the next ones wait 30 seconds. Forgot it? Run `ilovestock pin reset`, then `ilovestock serve` again.
-- **Pages.** Dashboard (statistics of the latest analysis in this session), Portfolio (planned for phase 2), Analysis (same rules and trade plan as the CLI), History (every saved analysis, with notes, edits and deletion: see [History](#history)), Settings (PIN and the same config file as the CLI).
+- **Pages.** Dashboard (statistics of the latest analysis in this session), Portfolio (planned for phase 2), Screener (same search as `ilovestock screen`, with "Analyze these" to fill in the Analysis page and a watchlist download: see [Find candidates](#find-candidates-fundamentals-first)), Analysis (same rules and trade plan as the CLI), History (every saved analysis, with notes, edits and deletion: see [History](#history)), Settings (PIN and the same config file as the CLI).
 
 > [!IMPORTANT]
 > The server listens on `127.0.0.1` only. The PIN is a lock for this computer, not real authentication: do not expose the app on a network.

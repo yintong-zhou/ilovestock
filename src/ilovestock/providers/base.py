@@ -7,6 +7,7 @@ import pandas as pd
 from ilovestock.models import Fundamentals
 
 BENCHMARK = "^GSPC"  # S&P 500
+HISTORY_PERIOD = "2y"  # enough for SMA 200d, RS SMA 52w, DMI warm-up
 
 
 class DataError(Exception):
@@ -14,8 +15,9 @@ class DataError(Exception):
 
 
 class MarketDataProvider(Protocol):
-    def history(self, ticker: str) -> pd.DataFrame:
-        """Daily adjusted OHLCV + Dividends, tz-naive DatetimeIndex, oldest first."""
+    def history(self, ticker: str, period: str = HISTORY_PERIOD) -> pd.DataFrame:
+        """Daily adjusted OHLCV + Dividends over `period` (yfinance code), tz-naive DatetimeIndex,
+        oldest first."""
         ...
 
     def fundamentals(self, ticker: str) -> Fundamentals: ...

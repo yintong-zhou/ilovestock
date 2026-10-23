@@ -6,13 +6,22 @@ from datetime import date
 import pandas as pd
 
 from ilovestock.config import Config
-from ilovestock.models import TickerAnalysis, Verdict
+from ilovestock.models import CriterionResult, Fundamentals, TickerAnalysis, Verdict
 from ilovestock.providers.base import BENCHMARK, MarketDataProvider
+from ilovestock.quality import quality
 from ilovestock.rules.earnings import earnings, post_earnings
 from ilovestock.rules.fundamental import fundamental
 from ilovestock.rules.technical import technical
 from ilovestock.rules.trade_plan import trade_plan
 from ilovestock.rules.verdict import verdict
+
+
+def fundamental_checks(
+    fund: Fundamentals, daily: pd.DataFrame, cfg: Config, today: date
+) -> tuple[list[CriterionResult], CriterionResult]:
+    """Fundamental + next-earnings criteria: same judgment for analyze and screen."""
+    source = fund.sources.get("next_earnings", "")
+    return fundamental(fund, daily, cfg), earnings(fund.next_earnings, today, source)
 
 
 def analyze(
@@ -30,14 +39,14 @@ def analyze(
         return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Data error: {e}"], error=str(e))
 
     try:
-        fund_results = fundamental(fund, daily, cfg)
+        fund_results, earn = fundamental_checks(fund, daily, cfg, today)
         next_source = fund.sources.get("next_earnings", "")
         tech_results = technical(daily, bench_close) + [
             post_earnings(fund.last_earnings, fund.last_earnings_amc, daily, next_source)
         ]
-        earn = earnings(fund.next_earnings, today, fund.sources.get("next_earnings", ""))
         plan = trade_plan(daily, cfg)
         v, reasons = verdict(fund_results, tech_results, earn, plan, allow_missing)
+        q = quality(fund)
     except Exception as e:  # malformed data: this ticker fails, not the benchmark or the run
         msg = f"{type(e).__name__}: {e}"
         return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Analysis error: {msg}"], error=msg)
@@ -52,6 +61,7 @@ def analyze(
         data_date=daily.index[-1].date(),
         price=round(float(daily["Close"].iloc[-1]), 2),
         fundamentals_date=fund.fetched,
+        quality=q,
     )
 
 

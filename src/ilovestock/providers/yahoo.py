@@ -7,9 +7,8 @@ import pandas as pd
 import yfinance as yf
 
 from ilovestock.models import Fundamentals
-from ilovestock.providers.base import DataError
+from ilovestock.providers.base import HISTORY_PERIOD, DataError
 
-HISTORY_PERIOD = "2y"  # enough for SMA 200d, RS SMA 52w, DMI warm-up
 COLUMNS = ["Open", "High", "Low", "Close", "Volume", "Dividends"]
 MARKET_TZ = "America/New_York"
 MARKET_CLOSE_HOUR = 16  # NYSE/NASDAQ regular close, New York time
@@ -59,9 +58,9 @@ def drop_partial_bar(
 
 
 class YahooProvider:
-    def history(self, ticker: str) -> pd.DataFrame:
+    def history(self, ticker: str, period: str = HISTORY_PERIOD) -> pd.DataFrame:
         t = yf.Ticker(ticker)
-        df = t.history(period=HISTORY_PERIOD, auto_adjust=True)
+        df = t.history(period=period, auto_adjust=True)
         if df.empty:
             raise DataError(f"{ticker}: no prices from Yahoo")
         # thresholds and the S&P 500 benchmark are in USD: other currencies would mix units
@@ -88,6 +87,7 @@ class YahooProvider:
         return Fundamentals(
             sales=_row(stmt, "Total Revenue"),
             eps=_row(stmt, "Diluted EPS", "Basic EPS"),
+            operating_income=_row(stmt, "Operating Income"),
             roe_pct=None if roe is None else roe * 100,
             market_cap=_num(info.get("marketCap")),
             next_earnings=dates[0] if dates else None,

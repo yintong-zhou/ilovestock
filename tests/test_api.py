@@ -5,8 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
+from ilovestock import screener
 from ilovestock.api import pin as pinmod
 from ilovestock.api.app import create_app
+from ilovestock.models import Quality
+from ilovestock.providers import finviz
 from ilovestock.providers.finviz import FinvizProvider
 from ilovestock.providers.yahoo import YahooProvider
 
@@ -127,6 +130,7 @@ def test_analyze(client):
     hzo, wlst = doc["results"]
     assert hzo["ticker"] == "HZO" and hzo["verdict"] == "NO-BUY"
     assert any(c["note"] == "source: Finviz" for c in hzo["fundamental"])
+    assert hzo["quality"]["roic_pct"] == 0.28
     assert hzo["plan"]["shares"] >= 1
     assert wlst["error"]  # no recorded data: reported per ticker
 
@@ -182,3 +186,46 @@ def test_pin_input_checked_before_hashing(client):
     assert client.post("/api/pin/unlock", json={"pin": "1" * 100}).status_code == 422
     big = "x" * (70 * 1024)
     assert client.post("/api/pin/unlock", json={"pin": big}).status_code == 413
+
+
+# --- screener ---
+def test_screen_needs_session(client):
+    assert client.post("/api/screen", json={"max": 20}).status_code == 401
+
+
+def test_screen_bounds(client):
+    unlocked(client)
+    assert client.post("/api/screen", json={"max": 51}).status_code == 422
+    assert client.post("/api/screen", json={"max": 0}).status_code == 422
+
+
+def test_screen_returns_counts_and_no_history(client, monkeypatch, tmp_path):
+    unlocked(client)
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: [("HZO", 1e9)])
+    r = client.post("/api/screen", json={"max": 20})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert (body["candidates"], body["passed"], body["hits"]) == (1, 0, [])
+    assert "not financial advice" in body["disclaimer"]
+    assert not (tmp_path / "history.csv").exists()
+
+
+def test_screen_serializes_hits(client, monkeypatch):
+    unlocked(client)
+    hit = screener.ScreenHit("ABCD", "1,240M (small)", Quality(31.2, 18.1, 14.0, 4.1), 96.0, 2, 3)
+    monkeypatch.setattr(
+        screener, "screen", lambda *a, **k: screener.ScreenResult(47, 47, ["ZZZ"], [hit])
+    )
+    body = client.post("/api/screen", json={}).json()
+    assert body["errors"] == ["ZZZ"]
+    assert body["hits"][0]["quality"]["margin_change_pt"] == 4.1
+    assert body["hits"][0]["roic_rank"] == 2
+
+
+def test_screen_too_many_is_422(client, monkeypatch):
+    unlocked(client)
+
+    rows = [(f"T{i}", 1e9) for i in range(101)]
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: iter(rows))
+    r = client.post("/api/screen", json={})
+    assert r.status_code == 422 and "more than 100" in r.json()["detail"]

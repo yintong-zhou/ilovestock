@@ -6,9 +6,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ilovestock.analysis import analyze_many
+from ilovestock.analysis import analyze, analyze_many, fundamental_checks
 from ilovestock.config import load
 from ilovestock.models import CriterionResult, Fundamentals, Status, TradePlan, Verdict
+from ilovestock.providers.finviz import FinvizProvider
 from ilovestock.providers.yahoo import YahooProvider
 from ilovestock.rules.earnings import earnings, post_earnings
 from ilovestock.rules.fundamental import fundamental, growth_pct, market_cap_band
@@ -273,6 +274,16 @@ def test_analysis_error_stays_with_its_ticker(fake_yf):
     assert r.verdict == Verdict.NO_BUY and r.error and r.reasons[0].startswith("Analysis error")
 
 
+def test_quality_error_stays_with_its_ticker(fake_yf):
+    class Broken(YahooProvider):
+        def fundamentals(self, t):  # malformed operating income
+            return replace(super().fundamentals(t), operating_income=["?"] * 5)
+
+    cfg = load(Path("does-not-exist.toml"))
+    (r,) = analyze_many(["HZO"], Broken(), cfg, date(2026, 10, 20))
+    assert r.error and r.reasons[0].startswith("Analysis error")
+
+
 def _closes(*values, end="2026-10-20"):
     return pd.DataFrame({"Close": values}, index=pd.bdate_range(end=end, periods=len(values)))
 
@@ -298,3 +309,14 @@ def test_post_earnings_unknown_date():
     daily = _closes(100, 101)
     assert post_earnings(None, None, daily, "Finviz").status == Status.PASS  # next announced
     assert post_earnings(None, None, daily, "Yahoo").status == Status.ND
+
+
+# --- shared judgment with the screener ---
+def test_fundamental_checks_is_what_analyze_uses(fake_yf, fake_finviz, bench_close):
+    p = FinvizProvider(YahooProvider())
+    r = analyze("HZO", p, bench_close, CFG, date(2026, 10, 22))
+    fund, earn = fundamental_checks(
+        p.fundamentals("HZO"), p.history("HZO"), CFG, date(2026, 10, 22)
+    )
+    assert r.fundamental == fund and r.earnings == earn
+    assert r.quality.roic_pct == 0.28

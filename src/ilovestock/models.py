@@ -54,8 +54,20 @@ class Fundamentals:
     last_earnings: date | None = None  # Finviz, while the next date is not announced yet
     last_earnings_amc: bool | None = None  # reported after the close: reaction the next session
     sources: dict[str, str] = field(default_factory=dict)  # field name -> "Finviz" | "Yahoo"
-    note: str = ""  # why Finviz data is missing
+    note: str = ""  # why Finviz or Yahoo data is missing (fetch error)
     fetched: date | None = None  # when this snapshot was taken (prices have their own date)
+    roic_pct: float | None = None  # Finviz "ROIC"; quality only, never a criterion
+    operating_income: list[float | None] = field(default_factory=list)  # quarterly (Yahoo)
+
+
+@dataclass
+class Quality:
+    """Informative: is the growth profitable? Never changes the verdict."""
+
+    roic_pct: float | None
+    margin_pct: float | None  # operating margin, latest quarter
+    margin_year_ago_pct: float | None  # same quarter a year earlier
+    margin_change_pt: float | None  # percentage points
 
 
 @dataclass
@@ -88,3 +100,4 @@ class TickerAnalysis:
     error: str | None = None
     price: float | None = None  # last close of the analyzed data
     fundamentals_date: date | None = None  # when the fundamentals were fetched
+    quality: Quality | None = None  # informative, outside the criteria and the verdict

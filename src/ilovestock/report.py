@@ -8,17 +8,54 @@ from rich.table import Table
 from ilovestock.models import (
     DISCLAIMER,
     CriterionResult,
+    Quality,
     Status,
     TickerAnalysis,
     TradePlan,
     Verdict,
 )
+from ilovestock.screener import ScreenResult
 
 STATUS_STYLE = {Status.PASS: "green", Status.FAIL: "red", Status.ND: "yellow"}
+QUALITY_NOTE = "informative, does not change the verdict"
 
 
 def _fmt(v: float | None) -> str:
     return "N/D" if v is None else f"{v:,.2f}"
+
+
+def _roic(q: Quality) -> str:
+    return "N/D" if q.roic_pct is None else f"{q.roic_pct:.1f}%"
+
+
+def _margin_change(q: Quality) -> str:
+    return "N/D" if q.margin_change_pt is None else f"{q.margin_change_pt:+.1f} pt"
+
+
+def quality_text(q: Quality) -> str:
+    return f"ROIC {_roic(q)}, op. margin {_margin_change(q)}"
+
+
+def _rank(r: int | None) -> str:
+    return "N/D" if r is None else f"#{r}"
+
+
+def screen_table(result: ScreenResult) -> Table:
+    # ASCII headers: a Windows pipe (cp1252) mangles symbols like the delta sign
+    t = Table(title="ilovestock: screen")
+    for col in ("#", "Ticker", "Market cap", "ROIC", "Op. margin chg (1y)", "Score", "Ranks"):
+        t.add_column(col, justify="right" if col in ("#", "ROIC", "Score") else "left")
+    for i, h in enumerate(result.hits, 1):
+        t.add_row(
+            str(i),
+            h.ticker,
+            h.market_cap or "N/D",
+            _roic(h.quality),
+            _margin_change(h.quality),
+            str(int(h.score + 0.5)),  # half up, like Math.round in the web app
+            f"ROIC {_rank(h.roic_rank)}, margin {_rank(h.margin_rank)} of {result.passed}",
+        )
+    return t
 
 
 VERDICT_STYLE = {
@@ -77,10 +114,10 @@ def plan_lines(p: TradePlan) -> list[str]:
 def detail(r: TickerAnalysis) -> Panel:
     if r.error:
         return Panel(escape(r.error), title=r.ticker, border_style="red")
-    parts: list = [
-        _criteria_table("Fundamental", [*r.fundamental, r.earnings]),
-        _criteria_table("Technical", r.technical),
-    ]
+    fundamental = _criteria_table("Fundamental", [*r.fundamental, r.earnings])
+    if r.quality:  # a shown row only: kept out of the criteria, so the verdict never sees it
+        fundamental.add_row("Quality", quality_text(r.quality), "-", "[cyan]INFO[/]", QUALITY_NOTE)
+    parts: list = [fundamental, _criteria_table("Technical", r.technical)]
     if r.plan:
         lines = [escape(line) for line in plan_lines(r.plan)]
         if r.plan.discarded:
