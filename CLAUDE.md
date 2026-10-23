@@ -89,7 +89,8 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
 **Config and files.**
 
 - Precedence: course defaults < `~/.config/ilovestock/config.toml` < CLI options (`config.py`).
-- Next to the config: `history.csv` (every analysis, shared by CLI and web) and `web_pin.json`
+- Next to the config: `history.csv` (every analysis, shared by CLI and web), `watchlist.txt` (web
+  watchlist, one ticker per line, readable by `analyze --watchlist`) and `web_pin.json`
   (hashed PIN).
 - Reports go to `reports/`.
 

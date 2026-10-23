@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-from ilovestock import screener
+from ilovestock import inputs, screener, watchlist
 from ilovestock.api import pin as pinmod
 from ilovestock.api.app import create_app
 from ilovestock.models import Quality
@@ -22,6 +22,7 @@ def client(tmp_path, fake_yf, fake_finviz):
         provider=FinvizProvider(YahooProvider()),
         static_dir=tmp_path / "no-dist",
         history_path=tmp_path / "history.csv",
+        watchlist_path=tmp_path / "watchlist.txt",
     )
     c = TestClient(app, base_url="http://127.0.0.1")
     c.pin_path = tmp_path / "pin.json"
@@ -180,6 +181,22 @@ def test_history_api(client):
     assert len(client.get("/api/history").json()) == 1
     assert client.delete("/api/history", params={"ticker": "hzo"}).status_code == 204
     assert client.get("/api/history").json() == []
+
+
+def test_watchlist_api(client, tmp_path, monkeypatch):
+    assert client.get("/api/watchlist").status_code == 401  # locked
+    unlocked(client)
+    assert client.get("/api/watchlist").json() == []
+    assert client.put("/api/watchlist/hzo").json() == ["HZO"]
+    assert client.put("/api/watchlist/HZO").json() == ["HZO"]  # already there: no duplicate
+    assert client.put("/api/watchlist/BRK.B").json() == ["HZO", "BRK.B"]
+    assert client.put("/api/watchlist/no%20way").status_code == 422
+    assert inputs.read_watchlist(tmp_path / "watchlist.txt") == ["HZO", "BRK.B"]  # CLI reads it
+
+    monkeypatch.setattr(watchlist, "MAX", 2)
+    assert client.put("/api/watchlist/WLST").status_code == 422  # full
+    assert client.delete("/api/watchlist/hzo").json() == ["BRK.B"]
+    assert client.delete("/api/watchlist/HZO").json() == ["BRK.B"]  # already gone: no error
 
 
 def test_pin_input_checked_before_hashing(client):

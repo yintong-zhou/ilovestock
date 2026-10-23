@@ -43,4 +43,7 @@ export const api = {
   deleteHistory: (id: string) => request<void>('DELETE', `/api/history/${encodeURIComponent(id)}`),
   deleteTickerHistory: (ticker: string) =>
     request<void>('DELETE', `/api/history?ticker=${encodeURIComponent(ticker)}`),
+  watchlist: () => request<string[]>('GET', '/api/watchlist'),
+  watch: (ticker: string) => request<string[]>('PUT', `/api/watchlist/${encodeURIComponent(ticker)}`),
+  unwatch: (ticker: string) => request<string[]>('DELETE', `/api/watchlist/${encodeURIComponent(ticker)}`),
 }

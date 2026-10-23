@@ -8,11 +8,12 @@ import History from './pages/History'
 import Portfolio from './pages/Portfolio'
 import Screener from './pages/Screener'
 import Settings from './pages/Settings'
+import Watchlist from './pages/Watchlist'
 import PinScreen from './PinScreen'
 import Sidebar, { type Page } from './Sidebar'
 import type { AnalyzeOut, PinStatus, ScreenOut } from './types'
 
-const PAGES: Page[] = ['dashboard', 'portfolio', 'screener', 'analysis', 'history', 'settings']
+const PAGES: Page[] = ['dashboard', 'portfolio', 'screener', 'analysis', 'history', 'watchlist', 'settings']
 
 /** '#history/HZO' -> ['history', 'HZO']: page plus an optional argument. */
 function routeFromHash(): [Page, string] {
@@ -24,7 +25,7 @@ export default function App() {
   const [status, setStatus] = useState<PinStatus | null>(null)
   const [error, setError] = useState('')
   const [[page, arg], setRoute] = useState(routeFromHash)
-  // Latest analysis of this session, shared by Analysis and Dashboard (not stored on disk).
+  // Latest analysis of this session: the Analysis page keeps it while you visit other pages.
   const [lastRun, setLastRun] = useState<AnalyzeOut | null>(null)
   const [lastScreen, setLastScreen] = useState<ScreenOut | null>(null)
   // A screen takes minutes, so it runs here, not in the page: leaving the page keeps it busy
@@ -102,7 +103,7 @@ export default function App() {
       <Sidebar page={page} onLock={lock} />
       <main className="px-4 py-8 md:ml-60 md:px-10 md:py-10">
         <div className="max-w-[1200px]">
-        {page === 'dashboard' && <Dashboard run={lastRun} />}
+        {page === 'dashboard' && <Dashboard onApiError={onApiError} />}
         {page === 'portfolio' && <Portfolio />}
         {page === 'screener' && (
           <Screener result={lastScreen} busy={screening} error={screenError} onSearch={runScreen} />
@@ -112,6 +113,7 @@ export default function App() {
           <Analysis key={arg} initialTickers={arg} run={lastRun} onRun={setLastRun} onApiError={onApiError} />
         )}
         {page === 'history' && <History ticker={arg} onApiError={onApiError} />}
+        {page === 'watchlist' && <Watchlist onApiError={onApiError} />}
         {page === 'settings' && <Settings onApiError={onApiError} />}
         </div>
       </main>

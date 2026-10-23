@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useState } from 'react'
 
-import { api } from './api'
+import { ApiError, api } from './api'
 import { Button, Field, Message } from './components'
 import { Wordmark } from './Sidebar'
 
@@ -44,7 +44,9 @@ export default function PinScreen({ mode, onUnlocked }: { mode: 'setup' | 'unloc
       await api.unlock(pin)
       onUnlocked()
     } catch (err) {
-      setError((err as Error).message)
+      // 401 = wrong PIN, 422 = not 4-8 digits; 429 (throttled) and network errors keep their text
+      const wrong = err instanceof ApiError && (err.status === 401 || err.status === 422)
+      setError(wrong ? 'Wrong PIN. Try again.' : (err as Error).message)
       setPin('')
     } finally {
       setBusy(false)
