@@ -1,9 +1,9 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
-import { Button, CriteriaTable, Field, inputClass, Message, PageHeader, Panel, StatusText, VerdictBadge } from '../components'
+import { Button, CriteriaTable, Field, inputClass, Message, PageHeader, Panel, RuleGroup, StatusText, VerdictBadge } from '../components'
 import { fmt } from '../format'
-import type { HistoryEdit, HistoryRow, Status, Verdict } from '../types'
+import type { CriterionResult, HistoryEdit, HistoryRow, Status, Verdict } from '../types'
 
 const VERDICTS: Verdict[] = ['BUY', 'BUY*', 'NO-BUY']
 const NUMBER_FIELDS = ['price', 'entry', 'stop', 'target'] as const
@@ -19,51 +19,108 @@ function byTicker(rows: HistoryRow[]): Map<string, HistoryRow[]> {
   return groups // each ticker: oldest first
 }
 
-function TickerList({ rows }: { rows: HistoryRow[] }) {
-  const tickers = [...byTicker(rows)].sort(([, a], [, b]) => b.at(-1)!.analyzed_at.localeCompare(a.at(-1)!.analyzed_at))
+const FILTERS = ['All tickers', 'Fundamentals all PASS', 'Technical all PASS', 'Both'] as const
+type Filter = (typeof FILTERS)[number]
+const PAGE_SIZES = [25, 50]
+/** Ticker list state, kept by History: opening a ticker and coming back keeps filter and page. */
+type View = { filter: Filter; size: number; page: number }
+
+/** history.py saves fundamentals, Next earnings, technical; like Analysis, Next earnings counts as fundamental. */
+function groups(criteria: CriterionResult[]) {
+  const i = criteria.findIndex((c) => c.name === 'Next earnings') + 1
+  return { fundamental: criteria.slice(0, i), technical: criteria.slice(i) }
+}
+
+const allPass = (items: CriterionResult[]) => items.length > 0 && items.every((c) => c.status === 'PASS')
+
+function keep(filter: Filter, f: boolean, t: boolean) {
+  return { 'All tickers': true, 'Fundamentals all PASS': f, 'Technical all PASS': t, Both: f && t }[filter]
+}
+
+function TickerList({ rows, view, onView }: { rows: HistoryRow[]; view: View; onView: (v: View) => void }) {
+  const tickers = [...byTicker(rows)]
+    .map(([ticker, list]) => ({ ticker, last: list.at(-1)!, count: list.length, ...groups(list.at(-1)!.criteria) }))
+    .sort((a, b) => b.last.analyzed_at.localeCompare(a.last.analyzed_at))
+  const shown = tickers.filter((t) => keep(view.filter, allPass(t.fundamental), allPass(t.technical)))
+  const pages = Math.max(1, Math.ceil(shown.length / view.size))
+  const page = Math.min(view.page, pages - 1) // a delete can leave the page past the end
+  const start = page * view.size
+  const slice = shown.slice(start, start + view.size)
   return (
     <Panel title="Analyzed tickers" aside={`${rows.length} analyses`}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="text-muted">
-            <tr className="border-b border-line">
-              <th className="py-2 pr-4 font-normal">Ticker</th>
-              <th className="py-2 pr-4 font-normal">Last verdict</th>
-              <th className="py-2 pr-4 font-normal">Previous</th>
-              <th className="py-2 pr-4 text-right font-normal">Analyses</th>
-              <th className="py-2 font-normal">Last analysis</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tickers.map(([ticker, list]) => {
-              const last = list.at(-1)!
-              const prev = list.at(-2)
-              return (
-                <tr key={ticker} className="border-b border-line/60 last:border-0 hover:bg-white/5">
-                  <td className="py-3 pr-4">
-                    <a href={`#history/${encodeURIComponent(ticker)}`} className="font-semibold text-teal-tint hover:underline">
-                      {ticker}
-                    </a>
-                  </td>
-                  <td className="py-3 pr-4"><VerdictBadge verdict={last.verdict} /></td>
-                  <td className="py-3 pr-4">
-                    {prev ? (
-                      <span className="flex items-center gap-2">
-                        <VerdictBadge verdict={prev.verdict} />
-                        {prev.verdict !== last.verdict && <span className="text-sm font-semibold text-teal-tint">changed</span>}
-                      </span>
-                    ) : (
-                      <span className="text-muted">first analysis</span>
-                    )}
-                  </td>
-                  <td className="py-3 pr-4 text-right">{list.length}</td>
-                  <td className="py-3 text-muted">{when(last.analyzed_at)}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <div role="group" aria-label="Show" className="flex flex-wrap rounded-sm border border-line">
+          {FILTERS.map((f) => (
+            <button key={f} type="button" aria-pressed={view.filter === f}
+              onClick={() => onView({ ...view, filter: f, page: 0 })}
+              className={`h-10 border-line px-4 not-last:border-r first:rounded-l-sm last:rounded-r-sm ${
+                view.filter === f ? 'bg-teal font-semibold text-white' : 'text-muted hover:text-text'}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+        <label className="ml-auto flex items-center gap-2 text-sm whitespace-nowrap text-muted">
+          Rows per page
+          <select className={`${inputClass} w-auto`} value={view.size}
+            onChange={(e) => onView({ ...view, size: Number(e.target.value), page: 0 })}>
+            {PAGE_SIZES.map((n) => <option key={n}>{n}</option>)}
+          </select>
+        </label>
       </div>
+      {shown.length === 0 ? (
+        <p className="text-muted">
+          No ticker matches this filter in its latest analysis.{' '}
+          <button type="button" className="text-teal-tint hover:underline" onClick={() => onView({ ...view, filter: 'All tickers', page: 0 })}>
+            Show all tickers
+          </button>
+        </p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-muted">
+                <tr className="border-b border-line">
+                  <th className="py-2 pr-4 font-normal">Ticker</th>
+                  <th className="py-2 pr-4 font-normal">Last verdict</th>
+                  <th className="py-2 pr-4 font-normal">Fundamental</th>
+                  <th className="py-2 pr-4 font-normal">Technical</th>
+                  <th className="py-2 pr-4 text-right font-normal">Analyses</th>
+                  <th className="py-2 font-normal">Last analysis</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slice.map(({ ticker, last, count, fundamental, technical }) => (
+                  <tr key={ticker} className="border-b border-line/60 last:border-0 hover:bg-white/5">
+                    <td className="py-3 pr-4">
+                      <a href={`#history/${encodeURIComponent(ticker)}`} className="font-semibold text-teal-tint hover:underline">
+                        {ticker}
+                      </a>
+                    </td>
+                    <td className="py-3 pr-4"><VerdictBadge verdict={last.verdict} /></td>
+                    <td className="py-3 pr-4"><RuleGroup title="Fundamental" items={fundamental} /></td>
+                    <td className="py-3 pr-4"><RuleGroup title="Technical" items={technical} /></td>
+                    <td className="py-3 pr-4 text-right">{count}</td>
+                    <td className="py-3 whitespace-nowrap text-muted">{when(last.analyzed_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted">
+              {start + 1}–{start + slice.length} of {shown.length}
+            </span>
+            <Button variant="quiet" className="ml-auto h-8 px-3 text-sm" disabled={page === 0}
+              onClick={() => onView({ ...view, page: page - 1 })}>
+              Previous
+            </Button>
+            <Button variant="quiet" className="h-8 px-3 text-sm" disabled={page === pages - 1}
+              onClick={() => onView({ ...view, page: page + 1 })}>
+              Next
+            </Button>
+          </div>
+        </>
+      )}
     </Panel>
   )
 }
@@ -217,6 +274,7 @@ function AnalysisCard({ row, onEdit, onDelete }: { row: HistoryRow; onEdit: (c: 
 export default function History({ ticker, onApiError }: { ticker: string; onApiError: (e: unknown) => void }) {
   const [rows, setRows] = useState<HistoryRow[] | null>(null)
   const [error, setError] = useState('')
+  const [view, setView] = useState<View>({ filter: 'All tickers', size: PAGE_SIZES[0], page: 0 })
 
   const load = useCallback(() => {
     api.history().then(setRows, (e: Error) => {
@@ -251,7 +309,7 @@ export default function History({ ticker, onApiError }: { ticker: string; onApiE
       {error && <Message kind="error">{error}</Message>}
       {rows === null ? null : !ticker ? (
         rows.length ? (
-          <TickerList rows={rows} />
+          <TickerList rows={rows} view={view} onView={setView} />
         ) : (
           <Panel>
             <p className="text-muted">No analyses yet. Run one from <a href="#analysis" className="text-teal-tint hover:underline">Analysis</a> and it appears here.</p>

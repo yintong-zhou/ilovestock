@@ -87,22 +87,35 @@ export function VerdictBadge({ verdict }: { verdict: Verdict }) {
   )
 }
 
+const passed = (items: CriterionResult[]) => items.filter((c) => c.status === 'PASS').length
+const cells = (items: CriterionResult[]) =>
+  items.map((c) => (
+    <span
+      key={c.name}
+      title={`${c.name}: ${c.status}${c.value === null ? '' : ` (${c.value})`}`}
+      className={`size-3 rounded-[2px] ${STATUS_FILL[c.status]}`}
+    />
+  ))
+
 /** One cell per rule, fundamental then technical: the method at a glance. */
 export function RuleMatrix({ fundamental, technical }: { fundamental: CriterionResult[]; technical: CriterionResult[] }) {
-  const passed = (items: CriterionResult[]) => items.filter((c) => c.status === 'PASS').length
   const label = `Fundamental ${passed(fundamental)} of ${fundamental.length} pass, technical ${passed(technical)} of ${technical.length} pass`
-  const cells = (items: CriterionResult[]) =>
-    items.map((c) => (
-      <span
-        key={c.name}
-        title={`${c.name}: ${c.status}${c.value === null ? '' : ` (${c.value})`}`}
-        className={`size-3 rounded-[2px] ${STATUS_FILL[c.status]}`}
-      />
-    ))
   return (
     <span role="img" aria-label={label} className="inline-flex items-center gap-2">
       <span className="flex gap-1">{cells(fundamental)}</span>
       <span className="flex gap-1">{cells(technical)}</span>
+    </span>
+  )
+}
+
+/** One group of rules and how many pass, e.g. "6/7". */
+export function RuleGroup({ title, items }: { title: string; items: CriterionResult[] }) {
+  return (
+    <span role="img" aria-label={`${title} ${passed(items)} of ${items.length} pass`} className="inline-flex items-center gap-2">
+      <span className="flex gap-1">{cells(items)}</span>
+      <span className="text-sm text-muted">
+        {passed(items)}/{items.length}
+      </span>
     </span>
   )
 }
