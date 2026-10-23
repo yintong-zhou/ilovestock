@@ -13,6 +13,7 @@ import {
   RuleLegend,
   RuleMatrix,
   VerdictBadge,
+  WatchButton,
 } from '../components'
 import { fmt } from '../format'
 import type { AnalyzeOut, TickerAnalysis } from '../types'
@@ -21,14 +22,17 @@ function fundamentalRules(r: TickerAnalysis) {
   return [...r.fundamental, ...(r.earnings ? [r.earnings] : [])]
 }
 
-function Detail({ r }: { r: TickerAnalysis }) {
+function Detail({ r, onApiError }: { r: TickerAnalysis; onApiError: (e: unknown) => void }) {
   return (
     <div className="border-t border-line bg-canvas/40 px-6 py-6">
-      <div className="mb-6 flex flex-wrap items-baseline gap-4">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <h3 className="font-heading text-xl font-bold">{r.ticker}</h3>
         <VerdictBadge verdict={r.verdict} />
         <span className="text-sm text-muted">
           Prices as of {r.data_date ?? 'N/D'}, fundamentals as of {r.fundamentals_date ?? 'N/D'}
+        </span>
+        <span className="ml-auto">
+          <WatchButton ticker={r.ticker} onApiError={onApiError} />
         </span>
       </div>
       {r.error ? (
@@ -179,7 +183,7 @@ export default function Analysis({
                     {isOpen && (
                       <tr>
                         <td colSpan={cols.length} className="p-0">
-                          <Detail r={r} />
+                          <Detail r={r} onApiError={onApiError} />
                         </td>
                       </tr>
                     )}

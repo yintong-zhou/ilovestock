@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type Page = 'dashboard' | 'portfolio' | 'screener' | 'analysis' | 'history' | 'settings'
+export type Page = 'dashboard' | 'portfolio' | 'screener' | 'analysis' | 'history' | 'watchlist' | 'settings'
 
 // Consistent line icons (brand: line iconography), 20px, stroke = currentColor.
 function Icon({ children }: { children: ReactNode }) {
@@ -18,6 +18,7 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
   { page: 'screener', label: 'Screener', icon: <Icon><path d="M3 4h18l-7 8v6l-4 2v-8z" /></Icon> },
   { page: 'analysis', label: 'Analysis', icon: <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></Icon> },
   { page: 'history', label: 'History', icon: <Icon><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Icon> },
+  { page: 'watchlist', label: 'Watchlist', icon: <Icon><path d="M6 3h12v18l-6-4-6 4z" /></Icon> },
   { page: 'settings', label: 'Settings', icon: <Icon><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" /></Icon> },
 ]
 

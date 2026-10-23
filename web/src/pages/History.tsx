@@ -1,15 +1,12 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
-import { Button, CriteriaTable, Field, inputClass, Message, PageHeader, Panel, RuleGroup, StatusText, VerdictBadge } from '../components'
-import { fmt } from '../format'
+import { Button, CriteriaTable, Field, inputClass, Message, PageHeader, Panel, RuleGroup, StatusText, VerdictBadge, WatchButton } from '../components'
+import { fmt, groups, when } from '../format'
 import type { CriterionResult, HistoryEdit, HistoryRow, Status, Verdict } from '../types'
 
 const VERDICTS: Verdict[] = ['BUY', 'BUY*', 'NO-BUY']
 const NUMBER_FIELDS = ['price', 'entry', 'stop', 'target'] as const
-
-/** '2026-10-20T15:04:00' -> '2026-10-20 15:04' */
-const when = (iso: string) => iso.replace('T', ' ').slice(0, 16)
 
 function byTicker(rows: HistoryRow[]): Map<string, HistoryRow[]> {
   const groups = new Map<string, HistoryRow[]>()
@@ -24,12 +21,6 @@ type Filter = (typeof FILTERS)[number]
 const PAGE_SIZES = [25, 50]
 /** Ticker list state, kept by History: opening a ticker and coming back keeps filter and page. */
 type View = { filter: Filter; size: number; page: number }
-
-/** history.py saves fundamentals, Next earnings, technical; like Analysis, Next earnings counts as fundamental. */
-function groups(criteria: CriterionResult[]) {
-  const i = criteria.findIndex((c) => c.name === 'Next earnings') + 1
-  return { fundamental: criteria.slice(0, i), technical: criteria.slice(i) }
-}
 
 const allPass = (items: CriterionResult[]) => items.length > 0 && items.every((c) => c.status === 'PASS')
 
@@ -301,7 +292,12 @@ export default function History({ ticker, onApiError }: { ticker: string; onApiE
 
   return (
     <>
-      <PageHeader title={ticker ? `History: ${ticker}` : 'History'} aside={ticker && <a href="#history" className="text-teal-tint hover:underline">← All tickers</a>}>
+      <PageHeader title={ticker ? `History: ${ticker}` : 'History'} aside={ticker && (
+        <span className="flex items-center gap-4">
+          <WatchButton ticker={ticker} onApiError={onApiError} />
+          <a href="#history" className="text-teal-tint hover:underline">← All tickers</a>
+        </span>
+      )}>
         {ticker
           ? 'Every saved analysis of this ticker, newest first, with what changed between one and the next.'
           : 'Every analysis is saved, from the web app and from the terminal. Pick a ticker to see how its verdict changed over time.'}

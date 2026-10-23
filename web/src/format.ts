@@ -1,4 +1,20 @@
-import type { Quality } from './types'
+import type { CriterionResult, HistoryRow, Quality } from './types'
+
+/** '2026-10-20T15:04:00' -> '2026-10-20 15:04' */
+export const when = (iso: string) => iso.replace('T', ' ').slice(0, 16)
+
+/** history.py saves fundamentals, Next earnings, technical; like Analysis, Next earnings counts as fundamental. */
+export function groups(criteria: CriterionResult[]) {
+  const i = criteria.findIndex((c) => c.name === 'Next earnings') + 1
+  return { fundamental: criteria.slice(0, i), technical: criteria.slice(i) }
+}
+
+/** The latest saved analysis of each ticker, newest first. */
+export function latestByTicker(rows: HistoryRow[]): HistoryRow[] {
+  const last = new Map<string, HistoryRow>()
+  for (const r of rows) if (!last.has(r.ticker) || r.analyzed_at >= last.get(r.ticker)!.analyzed_at) last.set(r.ticker, r)
+  return [...last.values()].sort((a, b) => b.analyzed_at.localeCompare(a.analyzed_at))
+}
 
 /** Number with fixed decimals, or N/D when missing. */
 export function fmt(v: number | null | undefined, digits = 2): string {

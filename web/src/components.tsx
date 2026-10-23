@@ -1,5 +1,6 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { type ButtonHTMLAttributes, type ReactNode, useEffect, useState } from 'react'
 
+import { api } from './api'
 import { fmt, qualityText } from './format'
 import type { CriterionResult, Quality, Status, TradePlan, Verdict } from './types'
 
@@ -46,6 +47,39 @@ export function Button({
     >
       {children}
     </button>
+  )
+}
+
+/** Adds or removes one ticker. Reads the list itself, so any page can show it. */
+export function WatchButton({ ticker, onApiError }: { ticker: string; onApiError: (e: unknown) => void }) {
+  const [list, setList] = useState<string[] | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.watchlist().then(setList, (e: Error) => {
+      setError(e.message)
+      onApiError(e)
+    })
+  }, [onApiError])
+
+  const watched = list?.includes(ticker) ?? false
+  async function toggle() {
+    setError('')
+    try {
+      setList(await (watched ? api.unwatch(ticker) : api.watch(ticker)))
+    } catch (err) {
+      setError((err as Error).message)
+      onApiError(err)
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Button variant="quiet" className="h-8 px-3 text-sm" disabled={list === null} onClick={toggle}>
+        {watched ? 'Remove from watchlist' : 'Add to watchlist'}
+      </Button>
+      {error && <span role="alert" className="text-sm text-fail">{error}</span>}
+    </span>
   )
 }
 

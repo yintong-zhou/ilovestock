@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ilovestock import config as cfgmod
-from ilovestock import history, inputs, screener
+from ilovestock import history, inputs, screener, watchlist
 from ilovestock.analysis import analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
 from ilovestock.export import SOURCES, data_date
@@ -84,6 +84,7 @@ def create_app(
     provider: MarketDataProvider | None = None,
     static_dir: Path = WEB_DIST,
     history_path: Path | None = None,
+    watchlist_path: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ilovestock", description=DISCLAIMER)
     app.add_middleware(
@@ -243,6 +244,28 @@ def create_app(
     @app.delete("/api/history", status_code=204, dependencies=[Depends(session)])
     def history_delete_ticker(ticker: str) -> None:
         history.delete(history_path, ticker=ticker.upper())
+
+    # Each route returns the whole list: the page shows exactly what is on disk.
+    @app.get("/api/watchlist", dependencies=[Depends(session)])
+    def watchlist_read() -> list[str]:
+        try:
+            return watchlist.read(watchlist_path)
+        except ValueError as e:  # a bad line written by hand
+            raise HTTPException(422, str(e)) from e
+
+    @app.put("/api/watchlist/{ticker}", dependencies=[Depends(session)])
+    def watchlist_add(ticker: str) -> list[str]:
+        try:
+            return watchlist.add(ticker, watchlist_path)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
+
+    @app.delete("/api/watchlist/{ticker}", dependencies=[Depends(session)])
+    def watchlist_remove(ticker: str) -> list[str]:
+        try:
+            return watchlist.remove(ticker, watchlist_path)
+        except ValueError as e:
+            raise HTTPException(422, str(e)) from e
 
     if static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
