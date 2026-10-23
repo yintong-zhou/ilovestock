@@ -28,9 +28,7 @@ def test_filters_default_config():
         "fa_roe_o15",
         "sh_instown_u80",
         "sh_insttrans_pos",
-        "fa_div_none",
-        "cap_microover",
-    ]
+    ]  # no dividend filter (Finviz uses the forward estimate) and no cap filter (see screen)
 
 
 def test_filters_take_the_loosest_bucket():
@@ -54,7 +52,7 @@ def test_filters_qoq_leaves_growth_out():
 def test_screener_url_has_no_country_filter():
     url = screener_url(DEFAULT)
     assert url.startswith("https://finviz.com/screener.ashx?v=111&f=fa_salesqoq_o20,")
-    assert "geo_" not in url
+    assert "geo_" not in url and url.endswith("&o=-marketcap")
 
 
 def applied_filters(html: str) -> set[str]:
@@ -89,8 +87,26 @@ class FakeProvider:
 
 
 def run(monkeypatch, data, **kw):
-    monkeypatch.setattr(finviz, "screener_tickers", lambda url, limit=None: list(data))
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: [(t, 1e9) for t in data])
     return screen(FakeProvider(data), kw.pop("cfg", CFG), TODAY, **kw)
+
+
+def test_candidates_are_micro_to_mid_by_cap(monkeypatch):
+    def rows(url):  # Finviz order: market cap descending
+        yield from [("GNT", 300e9), ("LRG", 10e9), ("MID", 9.99e9), ("MID", 9.99e9)]
+        yield from [("NOC", None), ("MIC", 50e6), ("NNO", 49.9e6)]  # 50M exactly is micro
+        raise AssertionError("read past the first nano")
+
+    monkeypatch.setattr(finviz, "screener_rows", rows)
+    r = screen(FakeProvider({t: good_fundamentals() for t in ("MID", "MIC")}), CFG, TODAY)
+    assert r.candidates == 2 and sorted(h.ticker for h in r.hits) == ["MIC", "MID"]
+
+
+def test_candidates_refuse_an_ignored_sort(monkeypatch):
+    # without the sort, stopping at the first nano would silently drop valid stocks
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: iter([("A", 1e9), ("B", 2e9)]))
+    with pytest.raises(finviz.FinvizError, match="not sorted by market cap"):
+        screen(FakeProvider({}), CFG, TODAY)
 
 
 def test_screen_keeps_only_all_pass_and_counts(monkeypatch):
@@ -129,11 +145,9 @@ def test_screen_ignores_post_earnings(monkeypatch):
 
 
 def test_screen_too_many_candidates(monkeypatch):
-    def boom(url, limit=None):
-        raise finviz.TooManyResults("x", total=150)
-
-    monkeypatch.setattr(finviz, "screener_tickers", boom)
-    with pytest.raises(finviz.FinvizError, match="150 candidates from Finviz: max 100"):
+    rows = [(f"T{i}", 1e9) for i in range(101)]
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: iter(rows))
+    with pytest.raises(finviz.FinvizError, match="more than 100 micro/small/mid candidates"):
         screen(FakeProvider({}), CFG, TODAY)
     with pytest.raises(finviz.FinvizError, match="yoy"):
         screen(FakeProvider({}), replace(CFG, growth_basis="qoq"), TODAY)

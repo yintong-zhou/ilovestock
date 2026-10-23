@@ -1,5 +1,6 @@
 """Fundamentals-first screener: loose Finviz pre-filter, then the exact rules of `analyze`."""
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -11,18 +12,22 @@ from ilovestock.models import Quality, Status
 from ilovestock.providers import finviz
 from ilovestock.providers.base import MarketDataProvider
 from ilovestock.quality import quality, ranks, scores
+from ilovestock.rules.fundamental import market_cap_band
 
 MAX_CANDIDATES = 100  # each candidate costs Finviz + Yahoo requests: ~5 minutes at most
 DEFAULT_RESULTS = 20
 MAX_RESULTS = inputs.MAX_TICKERS  # the list goes to `analyze`, which takes at most this many
 SCREENER_URL = "https://finviz.com/screener.ashx?v=111&f="
+BY_CAP_DESC = "&o=-marketcap"
 
 # Finviz screener buckets (verified on a real page: tests/fixtures/finviz_screener_default.html).
 # The pre-filter takes the loosest bucket that cannot drop a stock the exact rules would keep.
+# Not filtered on Finviz: dividends (its filter uses the forward estimate, the rule the trailing
+# year) and market cap (one option only, a custom range is Elite-only): see `candidates`.
 GROWTH_OVER = (5, 10, 15, 20, 25, 30)
 ROE_OVER = (5, 10, 15, 20, 25, 30, 35, 40, 45, 50)
 INST_OWN_UNDER = (10, 20, 30, 40, 50, 60, 70, 80, 90)
-CAP_OVER = {50: "microover", 300: "smallover", 2000: "midover", 10000: "largeover"}  # $M
+ALLOWED_BANDS = ("micro", "small", "mid")  # same as the Market cap rule
 
 
 def _over(levels, minimum: float) -> int | None:
@@ -41,14 +46,41 @@ def finviz_filters(cfg: Config) -> list[str]:
     own = min((x for x in INST_OWN_UNDER if x >= cfg.institutional_own_max), default=None)
     if own is not None:
         filters.append(f"sh_instown_u{own}")
-    filters += ["sh_insttrans_pos", "fa_div_none"]
-    if (x := _over(CAP_OVER, cfg.nano_max)) is not None:
-        filters.append(f"cap_{CAP_OVER[x]}")
+    filters.append("sh_insttrans_pos")
     return filters
 
 
 def screener_url(cfg: Config) -> str:
-    return SCREENER_URL + ",".join(finviz_filters(cfg))
+    return SCREENER_URL + ",".join(finviz_filters(cfg)) + BY_CAP_DESC
+
+
+def candidates(cfg: Config) -> list[str]:
+    """Pre-filter tickers in the micro/small/mid bands of the config, read by market cap descending:
+    large and giant are skipped, the first nano ends the list (no more pages are fetched).
+
+    A row with no Finviz market cap is skipped, like any other missing filtered value.
+    """
+    tickers: dict[str, None] = {}
+    last = math.inf
+    for t, cap in finviz.screener_rows(screener_url(cfg)):
+        if cap is None:
+            continue
+        if cap > last:  # stopping at the first nano is only safe in this order
+            raise finviz.FinvizError("Finviz rows not sorted by market cap: page changed")
+        last = cap
+        band = market_cap_band(cap, cfg)
+        if band == "nano":
+            break
+        if band in ALLOWED_BANDS:
+            tickers[t] = None
+        if len(tickers) > MAX_CANDIDATES:
+            yoy = '; growth_basis = "yoy" also filters growth on Finviz'
+            raise finviz.FinvizError(
+                f"more than {MAX_CANDIDATES} micro/small/mid candidates from Finviz. "
+                "Tighten the fundamental thresholds in the config"
+                + (yoy if cfg.growth_basis == "qoq" else "")
+            )
+    return list(tickers)
 
 
 @dataclass
@@ -63,7 +95,7 @@ class ScreenHit:
 
 @dataclass
 class ScreenResult:
-    candidates: int  # from the Finviz pre-filter
+    candidates: int  # micro/small/mid stocks from the Finviz pre-filter
     passed: int  # every fundamental and earnings criterion PASS
     errors: list[str]  # tickers skipped for data errors
     hits: list[ScreenHit]  # best `max_results` by quality score
@@ -76,15 +108,7 @@ def screen(
     max_results: int = DEFAULT_RESULTS,
     progress: Callable[[str], None] | None = None,
 ) -> ScreenResult:
-    try:
-        tickers = finviz.screener_tickers(screener_url(cfg), MAX_CANDIDATES)
-    except finviz.TooManyResults as e:
-        yoy = '; growth_basis = "yoy" also filters growth on Finviz'
-        raise finviz.FinvizError(
-            f"{e.total} candidates from Finviz: max {MAX_CANDIDATES}. "
-            "Tighten the fundamental thresholds in the config"
-            + (yoy if cfg.growth_basis == "qoq" else "")
-        ) from e
+    tickers = candidates(cfg)
     passed: list[tuple[str, str | None, Quality]] = []
     errors = []
     for t in tickers:

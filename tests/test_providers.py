@@ -84,6 +84,7 @@ def test_finviz_pct():
     assert finviz._pct("82.64%") == 82.64
     assert finviz._pct("-1.02%") == -1.02
     assert finviz._pct("-") is None and finviz._pct(None) is None
+    assert finviz._pct("nan%") is None and finviz._pct("inf") is None  # would break ranks/JSON
 
 
 TODAY = date(2026, 10, 20)  # day the fixtures were recorded
@@ -183,6 +184,35 @@ def test_screener_paginates(monkeypatch):
     monkeypatch.setattr(finviz.requests, "get", get)
     tickers = finviz.screener_tickers("https://finviz.com/screener.ashx?v=111&f=cap_small")
     assert len(tickers) == 40 and tickers[20] == "ARDX"
+
+
+def test_parse_screener_rows_reads_market_cap():
+    rows = finviz.parse_screener_rows(
+        (FIX / "finviz_screener_default.html").read_text(encoding="utf-8")
+    )
+    assert len(rows) == 20 and rows[0][0] == "AFRM" and rows[0][1] == pytest.approx(24.52e9)
+
+
+def test_screener_rows_page_lazily(monkeypatch):
+    pages = {1: "finviz_screener_p1.html", 21: "finviz_screener_p2.html"}  # 261 results
+    calls = []
+
+    class Resp:
+        def __init__(self, text):
+            self.text = text
+
+        def raise_for_status(self):
+            pass
+
+    def get(url, params, **_):
+        calls.append(params["r"])
+        name = pages.get(params["r"])
+        return Resp((FIX / name).read_text(encoding="utf-8") if name else "<html></html>")
+
+    monkeypatch.setattr(finviz.requests, "get", get)
+    rows = finviz.screener_rows("https://finviz.com/screener.ashx?v=111&o=-marketcap")
+    assert [next(rows) for _ in range(21)][20][0] == "ARDX" and calls == [1, 21]
+    assert len(list(rows)) == 19 and calls == [1, 21, 41]  # an empty page ends the rows
 
 
 def test_screener_rejects_other_hosts():

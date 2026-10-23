@@ -57,10 +57,17 @@ Per questo i titoli si ordinano con un punteggio di qualità, non per crescita d
 
 1. **Pre-filtro su Finviz.** Dalla config si costruisce un URL dello screener Finviz. I filtri
    sono: nessun filtro di paese; crescita vendite ed EPS (`Sales Q/Q`, `EPS Q/Q`, che su Finviz sono anno su anno);
-   ROE; proprietà istituzionale; transazioni istituzionali positive; nessun dividendo;
-   capitalizzazione da micro a mid secondo le fasce della config. Finviz ha soglie a scaglioni:
-   per ogni soglia si prende lo scaglione **più largo** che non scarta titoli validi. La lista si
-   legge con `providers/finviz.py::screener_tickers`, che oggi serve `--finviz-url`.
+   ROE; proprietà istituzionale; transazioni istituzionali positive. Finviz ha soglie a
+   scaglioni: per ogni soglia si prende lo scaglione **più largo** che non scarta titoli validi.
+   - *Corretto dopo la review Codex del 2026-10-23:* dividendo e capitalizzazione non sono più
+     filtri Finviz. Il filtro dividendi di Finviz usa la stima futura, mentre la regola usa gli
+     ultimi 12 mesi, quindi poteva scartare titoli validi. Il filtro di capitalizzazione accetta
+     una sola fascia (l'intervallo libero è solo Elite), quindi non poteva escludere large e
+     giant. Ora l'URL ordina per capitalizzazione decrescente (`o=-marketcap`) e
+     `screener.candidates` legge le righe con `providers/finviz.py::screener_rows`. Salta large
+     e giant, si ferma alla prima nano e usa le fasce di `market_cap_band`, le stesse della
+     regola. Se le righe non sono in ordine la ricerca si ferma con un errore, perché fermarsi
+     alla prima nano sarebbe sbagliato.
    - *Scelta di Claude, perdita accettata:* lo screener Finviz scarta i titoli che non hanno il
      dato filtrato. `analyze` invece, per crescita, ROE, proprietà istituzionale e market cap,
      ripiega su Yahoo. Un titolo con `-` su Finviz in uno di quei campi può quindi passare
@@ -73,9 +80,8 @@ Per questo i titoli si ordinano con un punteggio di qualità, non per crescita d
    - I codici dei filtri vanno presi da una risposta reale di Finviz, non indovinati (regola di
      `PROJECT.md`). Serve una richiesta dal vivo, da chiedere prima all'utente, e la pagina va
      salvata come fixture.
-2. **Tetto sui candidati.** Se il pre-filtro restituisce più di `MAX_CANDIDATES` titoli (valore
-   100), la ricerca si ferma e chiede soglie più strette, come fa già `screener_tickers` con
-   `max_results`. 100 tiene una ricerca sotto i 5 minuti circa, quindi `/api/screen` può restare
+2. **Tetto sui candidati.** Se il pre-filtro restituisce più di `MAX_CANDIDATES` titoli micro,
+   small o mid (valore 100), la ricerca si ferma e chiede soglie più strette. 100 tiene una ricerca sotto i 5 minuti circa, quindi `/api/screen` può restare
    una richiesta sincrona come `/api/analyze`, senza job in background. L'utente ha deciso di
    tenere 100 senza misurare prima il numero reale di candidati: se le sue soglie ne danno di
    più, le stringe lui.
@@ -113,7 +119,8 @@ Misura se la crescita crea valore, non solo fatturato.
   - *Scelta di Claude:* un valore N/D prende la posizione peggiore per quella misura. Il titolo
     resta in lista, perché la qualità non è un criterio del metodo.
   - *Scelta di Claude:* a parità di punteggio vince il ROIC più alto.
-  - Gruppo di un solo titolo: punteggio 100.
+  - Gruppo di un solo titolo: ogni misura disponibile vale 100, una misura N/D vale comunque 0
+    (la regola "N/D = posizione peggiore" prevale). Con entrambe N/D il punteggio è 0.
 - **Nota per titolo** (dettaglio nello screener), per esempio: `ROIC 31.2% → #2 di 47 · margine
   operativo 14.0% → 18.1% (+4.1 pt) → #3 di 47 · punteggio = media delle due posizioni, 0-100`.
 

@@ -6,7 +6,9 @@ Unofficial scraping: Finviz ToS may forbid it, quotes are delayed 15-20 min.
 """
 
 import dataclasses
+import math
 import re
+from collections.abc import Iterator
 from datetime import date, datetime
 
 import finviz
@@ -49,13 +51,14 @@ class TooManyResults(FinvizError):
 
 
 def _pct(value: str | None) -> float | None:
-    """'82.64%' -> 82.64; '-' or missing -> None."""
+    """'82.64%' -> 82.64; '-', missing or non-finite -> None."""
     if not value:
         return None
     try:
-        return float(value.strip().rstrip("%"))
+        f = float(value.strip().rstrip("%"))
     except ValueError:
         return None
+    return f if math.isfinite(f) else None
 
 
 def _money(value: str | None) -> float | None:
@@ -145,6 +148,28 @@ def parse_screener_page(html: str) -> tuple[list[str], int]:
     total = re.search(r"#\d+ / (\d+) Total", html)
     tickers = dict.fromkeys(re.findall(r'href="/quote\?t=([A-Z0-9.\-]+)&', html))
     return list(tickers), int(total.group(1)) if total else 0
+
+
+def parse_screener_rows(html: str) -> list[tuple[str, float | None]]:
+    """(ticker, market cap $) per row of an overview (v=111) page; '-' cap -> None."""
+    cells = re.findall(
+        r'data-row-key="([A-Z0-9.\-]+)".*?data-column-id="marketCap"[^>]*>([^<]*)<', html, re.S
+    )
+    return [(t, _money(cap)) for t, cap in cells]
+
+
+def screener_rows(url: str) -> Iterator[tuple[str, float | None]]:
+    """Rows of one of our screener URLs, page by page, fetched only as the caller reads them."""
+    row, total = 1, 1
+    while row <= total:
+        resp = requests.get(url, params={"r": row}, headers={"User-Agent": UA}, timeout=30)
+        resp.raise_for_status()
+        rows = parse_screener_rows(resp.text)
+        if not rows:
+            return
+        total = parse_screener_page(resp.text)[1]
+        yield from rows
+        row += PAGE_SIZE
 
 
 def screener_tickers(url: str, max_results: int | None = None) -> list[str]:

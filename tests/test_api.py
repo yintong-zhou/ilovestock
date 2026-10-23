@@ -201,7 +201,7 @@ def test_screen_bounds(client):
 
 def test_screen_returns_counts_and_no_history(client, monkeypatch, tmp_path):
     unlocked(client)
-    monkeypatch.setattr(finviz, "screener_tickers", lambda url, limit=None: ["HZO"])
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: [("HZO", 1e9)])
     r = client.post("/api/screen", json={"max": 20})
     assert r.status_code == 200, r.text
     body = r.json()
@@ -225,9 +225,7 @@ def test_screen_serializes_hits(client, monkeypatch):
 def test_screen_too_many_is_422(client, monkeypatch):
     unlocked(client)
 
-    def boom(url, limit=None):
-        raise finviz.TooManyResults("x", total=150)
-
-    monkeypatch.setattr(finviz, "screener_tickers", boom)
+    rows = [(f"T{i}", 1e9) for i in range(101)]
+    monkeypatch.setattr(finviz, "screener_rows", lambda url: iter(rows))
     r = client.post("/api/screen", json={})
-    assert r.status_code == 422 and "150 candidates" in r.json()["detail"]
+    assert r.status_code == 422 and "more than 100" in r.json()["detail"]

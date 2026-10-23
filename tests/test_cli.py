@@ -77,6 +77,7 @@ def offline(monkeypatch, fake_yf, fake_finviz, tmp_path):
     monkeypatch.setattr(cli, "CachedProvider", lambda p: p)
     monkeypatch.setattr(cli, "console", Console(width=200))
     monkeypatch.setattr(cli.finviz, "screener_tickers", lambda url, limit=None: ["SCRN", "HZO"])
+    monkeypatch.setattr(cli.finviz, "screener_rows", lambda url: [("SCRN", 1e9), ("HZO", 1e9)])
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
     monkeypatch.setattr(history, "HISTORY_PATH", tmp_path / "history.csv")
     return tmp_path
@@ -190,7 +191,7 @@ def test_detail_shows_quality_row(offline):
 
 # --- screen ---
 def test_screen_none_pass_exits_zero_without_file(offline):
-    # offline: screener_tickers -> ["SCRN", "HZO"]; SCRN has no data, HZO fails (ROE 0.42%)
+    # offline: screener_rows -> SCRN, HZO; SCRN has no data, HZO fails (ROE 0.42%)
     result = runner.invoke(cli.app, ["screen", "--out", str(offline / "w.txt")])
     assert result.exit_code == 0, result.output
     assert "No stock passes" in result.output and not (offline / "w.txt").exists()

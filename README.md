@@ -87,8 +87,9 @@ The list is saved as a watchlist (default `reports/screen-YYYY-MM-DD.txt`, chang
 ilovestock analyze --watchlist reports/screen-2026-10-22.txt
 ```
 
-- Only stocks with complete Finviz data are searched: a stock with a missing Finviz value on a filtered field never reaches the candidates, even if Yahoo has it.
-- A search stops with more than 100 candidates: tighten the thresholds in the config. Each candidate takes a few seconds.
+- Only stocks with complete Finviz data are searched: a stock with a missing Finviz value on a filtered field (or no Finviz market cap) never reaches the candidates, even if Yahoo has it.
+- Dividends and market cap are not filtered on Finviz: its dividend filter uses the forward estimate (the rule uses the last 12 months) and its market cap filter takes a single band. Finviz rows come sorted by market cap instead: large and giant caps are skipped, and the list ends at the first nano cap, with the same bands as the rule.
+- A search stops with more than 100 micro/small/mid candidates: tighten the thresholds in the config. Each candidate takes a few seconds.
 - With `growth_basis = "qoq"`, growth is not filtered on Finviz (it only has year-on-year), so more candidates come back.
 
 ### Analyze tickers

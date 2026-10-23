@@ -47,6 +47,8 @@ def test_scores_scale_and_average():
 def test_scores_none_is_worst_and_single_is_100():
     assert scores([q(None, 1), q(10, None)]) == [50.0, 50.0]
     assert scores([q(5, 1)]) == [100.0]
+    # alone, N/D is still the worst: only measures with data count as 100
+    assert scores([q(5, None)]) == [50.0] and scores([q(None, None)]) == [0.0]
 
 
 def test_quality_text_signs_and_nd():
