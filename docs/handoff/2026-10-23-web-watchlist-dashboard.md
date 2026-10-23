@@ -9,8 +9,8 @@ tags: [ilovestock, web, history, dashboard, watchlist, ux]
 
 ## Obiettivo
 
-`ilovestock` è uno strumento educativo, non consulenza finanziaria. Applica ai titoli USA il metodo
-del corso "Investire in azioni nel lungo termine": dà un verdetto BUY / NO-BUY con piano di trade e
+`ilovestock` è uno strumento educativo, non consulenza finanziaria. Usa l'analisi fondamentale e tecnica
+per valutare il potenziale dei titoli USA: dà un verdetto BUY / NO-BUY con piano di trade e
 ha uno screener dei fondamentali. Si usa da CLI e da una web app locale. Questa sessione ha
 lavorato su **navigazione e uso della web app**, partendo da quello che l'utente trova scomodo
 quando la usa.

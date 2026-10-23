@@ -14,7 +14,7 @@ runner = CliRunner()
 # --- config ---
 def test_precedence_default_file_cli(tmp_path):
     path = tmp_path / "c.toml"
-    assert config.load(path).capital == 20000  # course default
+    assert config.load(path).capital == 20000  # built-in default
     path.write_text("[portfolio]\ncapital = 5000\nrisk_pct = 0.5\n")
     cfg = config.load(path)
     assert (cfg.capital, cfg.risk_pct, cfg.r_multiple) == (5000, 0.5, 3)  # file > default
@@ -25,7 +25,7 @@ def test_precedence_default_file_cli(tmp_path):
 @pytest.mark.parametrize(
     "text",
     [
-        "[portfolio]\nrisk_pct = 3\n",  # course hard limit
+        "[portfolio]\nrisk_pct = 3\n",  # method hard limit
         "[portfolio]\nfoo = 1\n",
         "[nope]\nx = 1\n",
         '[portfolio]\ncapital = "a lot"\n',
@@ -34,7 +34,7 @@ def test_precedence_default_file_cli(tmp_path):
         "[portfolio]\ncapital = nan\n",
         "[plan]\nr_multiple = inf\n",
         "[market_cap]\nsmall_max = 100\n",  # bands must increase: micro 300 > small 100
-        "[portfolio]\nmax_position_pct = 25\n",  # course: a stock is at most 10%
+        "[portfolio]\nmax_position_pct = 25\n",  # method: a stock is at most 10%
         "[fundamental]\nroe_min = -5\n",
         "[fundamental]\ninstitutional_own_max = 120\n",
     ],

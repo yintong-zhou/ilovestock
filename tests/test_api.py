@@ -117,7 +117,7 @@ def test_config_read_and_update(client, tmp_path):
     r = client.put("/api/config", json={"capital": 15000, "risk_pct": 0.5})
     assert r.status_code == 200 and r.json()["capital"] == 15000
     assert "capital = 15000" in (tmp_path / "config.toml").read_text()
-    assert client.put("/api/config", json={"risk_pct": 3}).status_code == 422  # course limit
+    assert client.put("/api/config", json={"risk_pct": 3}).status_code == 422  # method limit
     assert client.put("/api/config", json={"nope": 1}).status_code == 422
 
 

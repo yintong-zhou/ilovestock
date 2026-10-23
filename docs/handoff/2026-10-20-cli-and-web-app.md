@@ -17,8 +17,8 @@ tags: [ilovestock, cli, web-app, finviz, pin, m6, m7]
 
 ## Obiettivo
 
-`ilovestock`: strumento educativo (non consulenza finanziaria) che applica il metodo del corso
-"Investire in azioni nel lungo termine" a titoli USA e dà un verdetto BUY / NO-BUY con un piano di
+`ilovestock`: strumento educativo (non consulenza finanziaria) che usa l'analisi
+fondamentale e tecnica per valutare il potenziale dei titoli USA e dà un verdetto BUY / NO-BUY con un piano di
 trade (entry, stop, target, numero di azioni). Due interfacce sullo stesso core Python: CLI
 (Typer + Rich) e web app locale (FastAPI + React), come chiedono `AGENT.md` e `PROJECT.md`. Il
 motivo: a mano il metodo richiede ~7 filtri fondamentali, 4 indicatori e il calcolo della
@@ -80,7 +80,7 @@ posizione; gli screener non hanno Donchian 10w e ADX 18d.
 - **Fonte dei fondamentali:** Finviz, con Yahoo come fallback per ogni singolo campo; la fonte è
   indicata nella nota di ogni criterio. Scartato: Yahoo principale con Finviz solo per gli
   istituzionali (preferenza dell'utente).
-- **Crescita:** default `yoy` da Finviz. `qoq` (quello del corso) si calcola dai trimestri Yahoo.
+- **Crescita:** default `yoy` da Finviz. `qoq` (quello del metodo) si calcola dai trimestri Yahoo.
   Scartato: `qoq` come default, perché i campi Finviz "Q/Q" sono in realtà YoY.
 - **`finviz`:** dipendenza obbligatoria. Scartato: extra facoltativo `[finviz]` (D10).
 - **Licenza:** GPL-3.0 (D9). Scartate: MIT e Apache-2.0.

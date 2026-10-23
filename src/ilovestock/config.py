@@ -1,4 +1,4 @@
-"""Config: course defaults < TOML file < CLI options."""
+"""Config: built-in defaults < TOML file < CLI options."""
 
 import dataclasses
 import math
@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 CONFIG_PATH = Path.home() / ".config" / "ilovestock" / "config.toml"
-MAX_RISK_PCT = 2.0  # course: above 2% per trade destroys the account
-MAX_POSITION_PCT = 10.0  # course: a single stock is always at most 10% of the portfolio
+MAX_RISK_PCT = 2.0  # method: above 2% per trade destroys the account
+MAX_POSITION_PCT = 10.0  # method: a single stock is always at most 10% of the portfolio
 ENTRY_MODES = ("breakout", "pullback", "restart")
 GROWTH_BASES = ("qoq", "yoy")
 

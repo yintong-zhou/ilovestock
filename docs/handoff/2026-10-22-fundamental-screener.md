@@ -9,8 +9,8 @@ tags: [ilovestock, screener, qualità, finviz, cache, pypi]
 
 ## Obiettivo
 
-`ilovestock` è uno strumento educativo, non consulenza finanziaria. Applica il metodo del corso
-"Investire in azioni nel lungo termine" ai titoli USA e dà un verdetto BUY / NO-BUY con un piano
+`ilovestock` è uno strumento educativo, non consulenza finanziaria. Usa l'analisi fondamentale
+e tecnica per valutare il potenziale dei titoli USA e dà un verdetto BUY / NO-BUY con un piano
 di trade, da CLI e da web app locale. Questa sessione ha aggiunto uno **screener dei
 fondamentali**. Prima l'utente cercava i titoli con uno screener esterno, che non ha gli stessi
 criteri del metodo, e passava ad `analyze` liste piene di titoli destinati al NO-BUY.

@@ -1,6 +1,6 @@
 """Trade plan: entry, technical stop, take profit in R multiples, position sizing.
 
-Defaults chosen for open decisions (configurable where the course allows):
+Defaults chosen for open decisions (configurable where the method allows):
 - D5 stop: lowest low of the previous 10 weeks (the consolidation low = lower Donchian band).
 - D6 entry: breakout = last close (price already above the band); pullback = retest of the
   upper Donchian band; restart = above the last completed week's high.

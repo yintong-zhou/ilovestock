@@ -10,16 +10,16 @@ from ilovestock.rules.trade_plan import entry_level, risk_band, size_position, t
 CFG = load(Path("does-not-exist.toml"))
 
 
-# Course examples. max_loss 100 = capital 10,000 x 1%; cap 100% so it never binds.
-def test_sizing_course_example_20_shares():
+# Method examples. max_loss 100 = capital 10,000 x 1%; cap 100% so it never binds.
+def test_sizing_method_example_20_shares():
     assert size_position(10_000, 1, 100, entry=50, stop=45) == (20, "risk")
 
 
-def test_sizing_course_example_100_shares():
+def test_sizing_method_example_100_shares():
     assert size_position(10_000, 1, 100, entry=50, stop=49) == (100, "risk")
 
 
-def test_sizing_course_example_exposure_cap_40_shares():
+def test_sizing_method_example_exposure_cap_40_shares():
     # capital 20,000, risk 0.5% -> max_loss 100; cap 10% -> 2,000 -> 40 shares at 50
     shares, binding = size_position(20_000, 0.5, 10, entry=50, stop=49)
     assert (shares, binding) == (40, "exposure")

@@ -12,7 +12,7 @@ const GROUPS: { title: string; fields: [NumKey, string, string?][] }[] = [
     fields: [
       ['capital', 'Capital'],
       ['risk_pct', 'Max loss per trade (%)', 'Below 0.5 very conservative, 0.5–1 moderate, 1–2 aggressive. Above 2 is rejected.'],
-      ['max_position_pct', 'Max weight per stock (%)', 'Course limit: above 10 is rejected.'],
+      ['max_position_pct', 'Max weight per stock (%)', 'Method limit: above 10 is rejected.'],
       ['r_multiple', 'Take profit (multiple of R)', 'Below 2 every trade is discarded.'],
     ],
   },

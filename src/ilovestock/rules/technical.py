@@ -1,6 +1,6 @@
 """Technical confirmations, fixed parameters. Not enough history -> N/D.
 
-Weekly signals use completed weeks only: the course confirms a breakout on the weekly close.
+Weekly signals use completed weeks only: the method confirms a breakout on the weekly close.
 """
 
 import pandas as pd
@@ -9,7 +9,7 @@ from ilovestock import indicators as ind
 from ilovestock.models import CriterionResult, Status
 
 MIN_DMI_BARS = 10 * ind.DMI_DAYS  # Wilder smoothing needs a long warm-up to be stable
-MAX_CORRECTION_PCT = 50  # course: consolidation correction < 50% (< 38% for short bases)
+MAX_CORRECTION_PCT = 50  # method: consolidation correction < 50% (< 38% for short bases)
 
 
 def _nd(name: str, threshold: str, note: str = "not enough history") -> CriterionResult:

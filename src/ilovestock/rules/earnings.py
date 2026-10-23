@@ -7,7 +7,7 @@ import pandas as pd
 from ilovestock.models import CriterionResult, Status
 
 MIN_DAYS_TO_EARNINGS = 10
-# Course: "wait for the report, analyze the data, wait for the market's reaction" (no number).
+# Method: "wait for the report, analyze the data, wait for the market's reaction" (no number).
 # User's rule: 1 session of reaction, 5 when the reaction moved the price by 5% or more.
 REACTION_SESSIONS = 1
 BIG_REACTION_SESSIONS = 5

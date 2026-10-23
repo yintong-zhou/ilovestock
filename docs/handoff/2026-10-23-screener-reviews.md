@@ -9,8 +9,8 @@ tags: [ilovestock, screener, review, codex, finviz, web, pypi]
 
 ## Obiettivo
 
-`ilovestock` è uno strumento educativo, non consulenza finanziaria. Applica ai titoli USA il metodo
-del corso "Investire in azioni nel lungo termine": dà un verdetto BUY / NO-BUY con piano di trade e
+`ilovestock` è uno strumento educativo, non consulenza finanziaria. Usa l'analisi fondamentale e tecnica
+per valutare il potenziale dei titoli USA: dà un verdetto BUY / NO-BUY con piano di trade e
 ha uno screener dei fondamentali. Lo usa da CLI e da una web app locale. Questa sessione ha messo in
 sicurezza lo screener con tre review Codex e una `/code-review high`, e l'ha portato su main. Il
 prossimo lavoro voluto dall'utente è **migliorare la navigazione e l'uso della web app**.

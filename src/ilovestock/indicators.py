@@ -1,6 +1,6 @@
 """Technical indicators as pure functions on pandas Series/DataFrames.
 
-Parameters are fixed course constants, never options: per-case tuning is a mistake per the course.
+Parameters are fixed method constants, never options: per-case tuning is a mistake per the method.
 """
 
 import numpy as np
@@ -21,7 +21,7 @@ def weekly(daily: pd.DataFrame) -> pd.DataFrame:
 
 def drop_running_week(weekly_data, last_day: pd.Timestamp):
     """Drop the last weekly bar unless the data reaches its Friday: weekly signals count on the
-    weekly close (course). ponytail: a Friday holiday leaves the week open one week longer."""
+    weekly close (method). ponytail: a Friday holiday leaves the week open one week longer."""
     done = len(weekly_data) and weekly_data.index[-1] == last_day
     return weekly_data if done else weekly_data.iloc[:-1]
 

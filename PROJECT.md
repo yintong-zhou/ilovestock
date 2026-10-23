@@ -9,14 +9,14 @@ Educational screening tool, not financial advice. Every output (terminal and fil
 - Ask first: git push; dependencies outside Stack; `slow` tests (they hit live Finviz); implementing an open decision (D1-D11) that has no Proposal.
 - Open decision with a Proposal: implement the Proposal as config default, note it in the PR.
 - Hard limits:
-  - Technical indicator parameters are fixed constants, never options (the course lists per-case tuning as a mistake).
+  - Technical indicator parameters are fixed constants, never options (the method treats per-case tuning as a mistake).
   - Reject `risk_pct` > 2. Discard a trade with R:R < 2.
   - Missing data → `N/D`. Never turn it into `PASS`.
   - Finviz field keys: read the library source or a real response. Do not guess.
   - No network in default tests or CI: use recorded fixtures.
 
 ## Goal
-- Per US ticker (NASDAQ, NYSE, AMEX; benchmark S&P 500): apply course fundamental + technical rules → verdict BUY / NO-BUY + trade plan (entry, stop, take profit, shares).
+- Per US ticker (NASDAQ, NYSE, AMEX; benchmark S&P 500): apply fundamental analysis (is the company worth owning?) + technical analysis (is now a moment of possible growth?) → verdict BUY / NO-BUY + trade plan (entry, stop, take profit, shares).
 - Output: terminal table + MD/CSV/JSON export.
 - Users: author (personal use), then retail investors following the method (open source).
 - Why: by hand the method needs ~7 fundamental filters, 4 indicators on mixed timeframes, earnings distance and position sizing. The Finviz screener lacks Donchian 10w and ADX 18d; charts don't compute stop or shares.
@@ -38,7 +38,7 @@ Educational screening tool, not financial advice. Every output (terminal and fil
 - Phase 2 (planned, not v1): portfolio management and hold/sell on open positions: trailing stop, cut exposure before earnings, 20% sector cap, 1-month pause after -10% portfolio or 7 consecutive losses, scale in/out.
 
 ## Features
-1. Fundamental analysis with course thresholds.
+1. Fundamental analysis with the method thresholds.
 2. Technical analysis, 4 confirmations.
 3. Earnings check: no entry near next earnings.
 4. Trade plan: technical stop, target in R multiples, position sizing.
@@ -61,7 +61,7 @@ Educational screening tool, not financial advice. Every output (terminal and fil
 | Quarterly Sales and EPS, ROE, market cap, dividend | yfinance | Usually only 4-5 quarters |
 | Next earnings date | yfinance, cross-check with Finviz | Check data quality |
 | Institutional ownership and transactions | Finviz (`finviz` lib) | Not in yfinance. Field keys unverified |
-| Candidate tickers | Finviz `Screener.init_from_url` | Course filters set on the site, URL copied |
+| Candidate tickers | Finviz `Screener.init_from_url` | Method filters set on the site, URL copied |
 
 **`finviz` library (README):**
 - `Screener(filters=[...], table="Overview", order="price")`; `Screener.init_from_url(url)`; `to_dataframe()` (needs pandas), `to_csv()`, `to_sqlite()`; `request_method="async"`.
@@ -103,7 +103,7 @@ pyproject.toml  README.md  LICENSE (TBD)
 ```
 ilovestock analyze [TICKER ...] [options]
 ilovestock screen [--max N] [--out FILE]   # fundamentals-first list, ranked by quality
-ilovestock config init     # write config with course defaults
+ilovestock config init     # write config with built-in defaults
 ilovestock config show     # effective config (file + overrides)
 ilovestock config path
 ```
@@ -122,7 +122,7 @@ ilovestock config path
 | `--detail` | per-criterion detail per ticker |
 
 - Inputs combine: final list = union of tickers, deduplicated.
-- Precedence: CLI option > config file > course default.
+- Precedence: CLI option > config file > built-in default.
 - Terminal: summary table (ticker, verdict, entry, stop, target, shares, failed criteria); `--detail` adds a panel per ticker.
 - Files: `reports/YYYY-MM-DD_HHMM/{report.md,results.csv,results.json}`, each with data date, sources, disclaimer.
 
@@ -145,7 +145,7 @@ roe_min = 15
 institutional_own_max = 80
 ```
 
-## Business rules (course)
+## Business rules (method)
 **Fundamental:**
 | Criterion | Threshold |
 |---|---|
@@ -167,12 +167,12 @@ institutional_own_max = 80
 | SMA | daily | 200 | price > SMA |
 
 **Trade plan:**
-1. Entry: course has 3 points (breakout, pullback, restart after pullback). v1 computes the level for `entry_mode`.
+1. Entry: the method has 3 points (breakout, pullback, restart after pullback). v1 computes the level for `entry_mode`.
 2. Stop: below the most important previous low. Technical, not monetary.
 3. Take profit = entry + `r_multiple` × (entry − stop). Min 2R (ideal 3-5R); below 2R discard.
 4. Shares = `floor(max_loss / (entry − stop))`, `max_loss = capital × risk_pct`.
 5. Exposure cap: position value ≤ `max_position_pct` of capital. If the cap binds, reduce shares and report which constraint won.
-6. `risk_pct` bands: < 0.5% very conservative, 0.5-1% moderate, 1-2% aggressive, > 2% rejected (course: destroys the account).
+6. `risk_pct` bands: < 0.5% very conservative, 0.5-1% moderate, 1-2% aggressive, > 2% rejected (method: destroys the account).
 7. Informational, non-blocking: initial trailing stop below the lower Donchian band 10w (8w for a faster exit); scale-out hint (½ at 1R + ½ above 3R).
 
 **Verdict:**
@@ -184,7 +184,7 @@ institutional_own_max = 80
 - Indicators: compare with an independent implementation (dev dependency pandas-ta or TA-Lib) on fixed price series.
 - Providers: recorded fixtures; missing-data cases.
 - Finviz adapter: recorded responses + a contract test against the live site, marked `slow`, not run in CI (detects page-structure changes).
-- Sizing, course examples:
+- Sizing, method examples:
   - max_loss 100, entry 50, stop 45 → 20 shares
   - max_loss 100, entry 50, stop 49 → 100 shares
   - capital 20,000 with 10% cap → max 2,000 value → 40 shares at 50; effective risk 40 instead of 100
@@ -204,7 +204,7 @@ No deadlines (spare-time development). Ordered by dependency.
 | M1 Data | yfinance provider with cache; data models | Prices, financials, calendar for a ticker download and reload from cache |
 | M2 Indicators | SMA, Donchian, DMI/ADX, relative strength | Tests green vs reference implementation |
 | M3 Rules | Fundamental, technical, earnings, verdict aggregation | `analyze TICKER` prints per-criterion result |
-| M4 Trade plan | Entry, stop, take profit, sizing, cap, validations | Course examples give 20 / 100 / 40 shares |
+| M4 Trade plan | Entry, stop, take profit, sizing, cap, validations | Method examples give 20 / 100 / 40 shares |
 | M5 Input + config | Watchlist, Finviz import (adapter over `finviz`), TOML, CLI override | 3 inputs combine; parameter precedence tested |
 | M6 Report | Rich table, MD/CSV/JSON export | 3 files carry date, sources, disclaimer |
 | M7 Release | README, license, docs, first public release | `pip install` works from a clean repo |
@@ -212,13 +212,13 @@ No deadlines (spare-time development). Ordered by dependency.
 
 ## Open decisions
 **Before M3-M4:**
-- D1 ROE: the course text says "ROE > 15% Q/Q" but the screener table says "ROE > 15%". Level or change? **Decided: level (ROE > 15%).**
-- D2 Q/Q definition: course = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. **Decided (2026-10-20): default `yoy` from Finviz, option `qoq` from yfinance.**
+- D1 ROE: the method text says "ROE > 15% Q/Q" but the screener table says "ROE > 15%". Level or change? **Decided: level (ROE > 15%).**
+- D2 Q/Q definition: method = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. **Decided (2026-10-20): default `yoy` from Finviz, option `qoq` from yfinance.**
 - D3 Missing institutional data (ticker lacks it or the library fails). Proposal: criterion `N/D`, verdict NO-BUY reason "missing data", option `--allow-missing` to skip knowingly. **Decided: as proposed; with `--allow-missing` the verdict is `BUY*` (incomplete data), never a plain BUY.**
-- D4 Market cap thresholds: course names the bands (nano, micro, small, mid, large, giant) without numbers in the course material read. Proposal: start from Finviz bands, make them configurable.
+- D4 Market cap thresholds: the method names the bands (nano, micro, small, mid, large, giant) without numbers in the material read. Proposal: start from Finviz bands, make them configurable.
 - D5 Stop algorithm for "most important previous low". Proposal: low of the consolidation or last pivot low over N weeks.
 - D6 Default entry mode. Proposal: `breakout`; `pullback`, `restart` as options.
-- D7 Consolidation/breakout check (correction < 50% / < 38%, volumes): blocking or informational in v1? **Decided (2026-10-21): blocking, as in the course: correction < 50% over the 10 weeks before the breakout, breakout week volume above the 10-week average, on completed weeks only.** Post-earnings: wait 1 session of reaction, 5 if the move is >= 5%.
+- D7 Consolidation/breakout check (correction < 50% / < 38%, volumes): blocking or informational in v1? **Decided (2026-10-21): blocking, as in the method: correction < 50% over the 10 weeks before the breakout, breakout week volume above the 10-week average, on completed weeks only.** Post-earnings: wait 1 session of reaction, 5 if the move is >= 5%.
 - D8 Intermediate "watchlist" state (fundamentals pass, technicals not yet). v1 keeps BUY / NO-BUY (plus `BUY*` from D3) until decided.
 
 **Before publishing:**

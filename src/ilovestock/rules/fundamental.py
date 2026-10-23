@@ -1,4 +1,4 @@
-"""Fundamental criteria with course thresholds. Missing data -> N/D, never PASS."""
+"""Fundamental criteria with the method thresholds. Missing data -> N/D, never PASS."""
 
 from datetime import timedelta
 

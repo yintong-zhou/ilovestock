@@ -19,7 +19,7 @@
 
 Applying a stock-picking method by hand is slow: about seven fundamental filters, four technical indicators on mixed timeframes, the distance to the next earnings report and position sizing, for every ticker. Common screeners lack some of the indicators (Donchian 10 weeks, ADX 18 days), and charting tools don't compute stops or share counts.
 
-ilovestock does that work for you. For each US ticker (NASDAQ, NYSE, AMEX), it:
+ilovestock does that work for you. It combines fundamental analysis, to judge whether a company is worth owning, with technical analysis, to judge whether now is a moment of possible growth. For each US ticker (NASDAQ, NYSE, AMEX), it:
 
 1. Downloads prices and financials, with a daily disk cache.
 2. Checks each fundamental, earnings and technical criterion against fixed thresholds.
@@ -40,7 +40,7 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 - **Report files.** Markdown, CSV and JSON export, each with data date, sources and disclaimer.
 - **Fundamentals-first screener.** Finds the US-listed stocks that pass every fundamental rule and ranks them by quality, ready for the full analysis.
 - **Flexible input.** Tickers on the command line, a watchlist file and a Finviz screener URL can be combined; duplicates are removed.
-- **Layered config.** Course defaults, then a TOML file, then CLI options.
+- **Layered config.** Built-in defaults, then a TOML file, then CLI options.
 
 ## Getting started
 
@@ -160,12 +160,12 @@ In the web app, the **History** page lists the analyzed tickers and, for each on
 ### Configuration
 
 ```bash
-ilovestock config init    # write the config file with course defaults
+ilovestock config init    # write the config file with built-in defaults
 ilovestock config show    # print the effective config (defaults + file)
 ilovestock config path    # print the config file location
 ```
 
-The config file is `~/.config/ilovestock/config.toml`. CLI options override the file, and the file overrides the course defaults:
+The config file is `~/.config/ilovestock/config.toml`. CLI options override the file, and the file overrides the built-in defaults:
 
 ```toml
 [portfolio]
@@ -240,7 +240,7 @@ ilovestock serve                                   # http://127.0.0.1:3000 (or 3
 | SMA 200 | daily | Price above the SMA |
 | After last earnings | daily | At least 1 session of reaction after the report, 5 if the reaction moved the price 5% or more |
 
-Weekly criteria use completed weeks only: a breakout counts once the week has closed, as in the course. During the week they show the last completed week.
+Weekly criteria use completed weeks only: a breakout counts once the week has closed. During the week they show the last completed week.
 
 ### Trade plan
 
@@ -248,7 +248,7 @@ Weekly criteria use completed weeks only: a breakout counts once the week has cl
 - **Stop**: the lowest low of the previous 10 weeks. It is a technical stop, not a monetary one.
 - **Take profit**: `entry + r_multiple × (entry − stop)`. If `r_multiple` is below 2, the trade is discarded.
 - **Shares**: `floor(capital × risk_pct / (entry − stop))`, reduced if the position would exceed `max_position_pct`. The output says which of the two limits set the share count.
-- **Shares** are also capped by the course limit: `max_position_pct` above 10 is rejected.
+- **Shares** are also capped by the method's limit: `max_position_pct` above 10 is rejected.
 - **For information only**: initial trailing stops (Donchian 10 and 8 weeks) and a scale-out hint (½ at 1R, ½ at the target).
 
 ## Data and limits
@@ -264,7 +264,7 @@ Each criterion's note shows where its value came from (`source: Finviz` or `sour
 
 > [!NOTE]
 > - Neither source is official. Either can block requests or change its format without notice. Prices and fundamentals are cached for one day in `~/.cache/ilovestock`.
-> - Finviz "Sales Q/Q" and "EPS Q/Q" compare with the same quarter last year, so the default growth basis is `yoy`. This is a deliberate deviation: the course defines growth vs the previous quarter. Use `--growth-basis qoq` to apply the course's definition, computed from Yahoo quarters (usually only 4–5 are available).
+> - Finviz "Sales Q/Q" and "EPS Q/Q" compare with the same quarter last year, so the default growth basis is `yoy`. This is a deliberate deviation: the method defines growth vs the previous quarter. Use `--growth-basis qoq` to apply the method's definition, computed from Yahoo quarters (usually only 4–5 are available).
 > - Finviz shows the earnings date without a year, and keeps the last report date until the next one is announced. A past date is used as the last report (for the wait after earnings) and Yahoo's date is used as the next one.
 > - Finviz shows `-` for both "no dividend" and "missing". In that case the dividend yield is computed from Yahoo's dividend history.
 > - The `finviz` 2.0.0 screener no longer parses the current Finviz site, so ilovestock reads ticker links from the screener pages itself.

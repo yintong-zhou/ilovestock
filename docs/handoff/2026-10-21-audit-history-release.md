@@ -9,8 +9,8 @@ tags: [ilovestock, audit, history, pypi, m7]
 
 ## Obiettivo
 
-`ilovestock`: strumento educativo (non consulenza finanziaria) che applica il metodo del corso
-"Investire in azioni nel lungo termine" ai titoli USA e restituisce BUY / NO-BUY con un piano di
+`ilovestock`: strumento educativo (non consulenza finanziaria) che usa l'analisi
+fondamentale e tecnica per valutare il potenziale dei titoli USA e restituisce BUY / NO-BUY con un piano di
 trade. Le interfacce sono due, CLI e web app locale, sullo stesso core. Serve perché a mano il
 metodo è lento e gli screener non hanno tutti gli indicatori.
 
@@ -72,18 +72,18 @@ metodo è lento e gli screener non hanno tutti gli indicatori.
   monouso nel browser.
 - **CORS:** rimosso. Il proxy di Vite è same-origin, e c'è un controllo `Origin` (403
   cross-origin).
-- **D7, consolidamento e volume:** ora sono **bloccanti** (scelta dell'utente, come nel corso):
+- **D7, consolidamento e volume:** ora sono **bloccanti** (scelta dell'utente, come nel metodo):
   correzione < 50% nelle 10 settimane, volume della settimana di breakout > media a 10
   settimane. Prima erano informativi.
-- **Segnali settimanali** (forza relativa, Donchian) solo su settimane chiuse: il corso conferma
+- **Segnali settimanali** (forza relativa, Donchian) solo su settimane chiuse: il metodo conferma
   il breakout sulla chiusura settimanale. Scartato il breakout a settimana in corso.
 - **Attesa dopo la trimestrale:** almeno 1 sessione di reazione, 5 se la reazione muove il
   prezzo del 5% o più. È l'interpretazione di "1-5 giorni in base al movimento" detta
   dall'utente. La data viene dal campo `Earnings` di Finviz, quando è passata (BMO/AMC); senza
   BMO/AMC si assume AMC.
 - **Crescita:** resta `yoy` come default (D2). Nel README è scritto che è una deviazione dal
-  corso (che usa Q/Q).
-- **`max_position_pct`:** massimo 10% come nel corso. Soglie di crescita e ROE >= 0, ownership
+  metodo (che usa Q/Q).
+- **`max_position_pct`:** massimo 10% come nel metodo. Soglie di crescita e ROE >= 0, ownership
   istituzionale tra 0 e 100.
 - **Storico:**
   - CSV in `~/.config/ilovestock/history.csv`, una riga per ticker per analisi.

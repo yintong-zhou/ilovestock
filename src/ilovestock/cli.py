@@ -70,7 +70,7 @@ def analyze(
         int, typer.Option(help="Refuse larger runs (each ticker hits Finviz and Yahoo)", min=1)
     ] = inputs.MAX_TICKERS,
 ) -> None:
-    """Analyze one or more tickers with the course rules."""
+    """Analyze one or more tickers with the fundamental and technical rules."""
     try:
         cfg = cfgmod.load(
             config_file,
@@ -193,7 +193,7 @@ def screen(
 def config_init(
     force: Annotated[bool, typer.Option(help="Overwrite an existing file")] = False,
 ) -> None:
-    """Write the config file with course defaults."""
+    """Write the config file with built-in defaults."""
     path = cfgmod.CONFIG_PATH
     if path.exists() and not force:
         _fail(f"{path} already exists (use --force to overwrite)")

@@ -2,10 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-`ilovestock` applies the method of the course "Investire in azioni nel lungo termine" to US stocks:
-a BUY / NO-BUY verdict with a trade plan, and a fundamentals-first screener. It has one Python core
-and two thin interfaces: a Typer CLI and a local web app (FastAPI + React). It is an educational
-tool, not financial advice, and every output must say so.
+`ilovestock` uses fundamental and technical analysis to judge the potential of US stocks: the
+fundamentals say whether the company is worth owning, the technicals whether now is a moment of
+possible growth. It gives a BUY / NO-BUY verdict with a trade plan and has a fundamentals-first
+screener. It has one Python core and two thin interfaces: a Typer CLI and a local web app
+(FastAPI + React). It is an educational tool, not financial advice, and every output must say so.
 
 Read `AGENT.md` (agent rules, 3-layer architecture, autonomy) and `PROJECT.md` (business rules,
 open decisions D1-D11) before changing behavior. The "Layout" section of `PROJECT.md` is
@@ -90,7 +91,7 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
 
 **Config and files.**
 
-- Precedence: course defaults < `~/.config/ilovestock/config.toml` < CLI options (`config.py`).
+- Precedence: built-in defaults < `~/.config/ilovestock/config.toml` < CLI options (`config.py`).
 - Next to the config: `history.csv` (every analysis, shared by CLI and web), `watchlist.txt` (web
   watchlist, one ticker per line, readable by `analyze --watchlist`) and `web_pin.json`
   (hashed PIN).
