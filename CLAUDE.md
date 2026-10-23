@@ -35,7 +35,9 @@ python execution/record_fixtures.py --screen                # default screener p
 CI (`.github/workflows/ci.yml`) runs ruff, ruff format and `pytest -m "not slow"` on Python 3.11
 and 3.13, plus web lint and build. Run all of them before reporting work as done.
 
-Release: the UI ships as package data, so build the frontend before `python -m build`.
+Packaging: the built UI (`src/ilovestock/static/`, git-ignored) ships as package data, so build
+the frontend before `pip install .` or `python -m build`. Publishing to PyPI is not a goal: the
+user decided against it, so installation is from the repository.
 
 ## Architecture
 

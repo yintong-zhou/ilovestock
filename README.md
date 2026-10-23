@@ -47,14 +47,20 @@ Example: `ilovestock analyze AAPL --detail` (data as of 2026-10-20):
 ### Prerequisites
 
 - Python 3.11 or later
+- Node.js, to build the web UI
 
 ### Installation
 
+ilovestock is not published on PyPI: install it from the repository.
+
 ```bash
-pip install ilovestock
+git clone https://github.com/yintong-zhou/ilovestock.git
+cd ilovestock
+cd web && npm ci && npm run build && cd ..   # builds the web UI into the package
+pip install .
 ```
 
-The web UI is included. To work on the code, see [Development](#development).
+To work on the code, see [Development](#development).
 
 > [!CAUTION]
 > Fundamentals come from Finviz through scraping, and that may violate Finviz's terms of service. Finviz quotes are also delayed 15–20 minutes. Use ilovestock only if you accept that.
@@ -309,5 +315,4 @@ web/              React frontend
 
 ### Roadmap
 
-- First public release on PyPI
 - Phase 2: managing open positions (hold/sell, trailing stop, sector cap)
