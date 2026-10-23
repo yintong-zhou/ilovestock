@@ -215,7 +215,7 @@ def create_app(
     @app.post("/api/screen", dependencies=[Depends(session)])
     def screen(body: ScreenIn) -> ScreenOut:
         today = date.today()
-        try:  # ponytail: synchronous like /api/analyze; MAX_CANDIDATES bounds it to minutes
+        try:  # ponytail: synchronous like /api/analyze; the config's max_candidates bound it
             result = screener.screen(
                 provider,
                 cfgmod.load(cfg_path),

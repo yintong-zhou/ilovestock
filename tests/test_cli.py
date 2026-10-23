@@ -37,6 +37,9 @@ def test_precedence_default_file_cli(tmp_path):
         "[portfolio]\nmax_position_pct = 25\n",  # method: a stock is at most 10%
         "[fundamental]\nroe_min = -5\n",
         "[fundamental]\ninstitutional_own_max = 120\n",
+        "[screener]\nmax_candidates = 0\n",
+        "[screener]\nmax_candidates_large = 501\n",
+        "[screener]\nmax_candidates = 150.5\n",
     ],
 )
 def test_invalid_config_rejected(tmp_path, text):

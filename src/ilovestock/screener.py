@@ -13,7 +13,6 @@ from ilovestock.providers.base import MarketDataProvider
 from ilovestock.quality import quality, ranks, scores
 from ilovestock.rules.fundamental import market_cap_band
 
-MAX_CANDIDATES = 100  # each candidate costs Finviz + Yahoo requests: ~5 minutes at most
 MAX_ROWS = 1000  # rows read before the first nano, large/giant included: ~70 page requests at most
 SCREEN_PERIOD = "1y"  # its rules read prices only for the dividends paid in the last 365 days
 DEFAULT_RESULTS = 20
@@ -64,6 +63,9 @@ def candidates(cfg: Config, include_large: bool = False) -> list[str]:
     A row with no Finviz market cap is skipped, like any other missing filtered value.
     """
     bands = ALLOWED_BANDS + LARGE_BANDS if include_large else ALLOWED_BANDS
+    # each candidate costs Finviz + Yahoo requests, a few seconds: the config caps them
+    key = "max_candidates_large" if include_large else "max_candidates"
+    limit = int(getattr(cfg, key))
     tickers = []
     for i, (t, cap) in enumerate(finviz.screener_rows(screener_url(cfg)), 1):
         if i > MAX_ROWS:
@@ -78,11 +80,11 @@ def candidates(cfg: Config, include_large: bool = False) -> list[str]:
             break
         if band in bands:
             tickers.append(t)
-        if len(tickers) > MAX_CANDIDATES:
+        if len(tickers) > limit:
             yoy = '; growth_basis = "yoy" also filters growth on Finviz'
             raise finviz.FinvizError(
-                f"more than {MAX_CANDIDATES} {'/'.join(bands)} candidates from Finviz. "
-                "Tighten the fundamental thresholds in the config"
+                f"more than {limit} {'/'.join(bands)} candidates from Finviz. "
+                f"Tighten the fundamental thresholds or raise {key} in the config (Settings)"
                 + (yoy if cfg.growth_basis == "qoq" else "")
             )
     return tickers

@@ -9,6 +9,7 @@ from pathlib import Path
 CONFIG_PATH = Path.home() / ".config" / "ilovestock" / "config.toml"
 MAX_RISK_PCT = 2.0  # method: above 2% per trade destroys the account
 MAX_POSITION_PCT = 10.0  # method: a single stock is always at most 10% of the portfolio
+MAX_SCREEN_CANDIDATES = 500  # a screen this large takes about 25 minutes
 ENTRY_MODES = ("breakout", "pullback", "restart")
 GROWTH_BASES = ("qoq", "yoy")
 
@@ -37,6 +38,10 @@ micro_max = 300
 small_max = 2000
 mid_max = 10000
 large_max = 200000
+
+[screener]               # Finviz candidates checked one by one, a few seconds each; 1 to 500
+max_candidates = 100
+max_candidates_large = 200  # with large and giant caps (--include-large)
 """
 DEFAULTS: dict[str, dict] = tomllib.loads(TEMPLATE)
 
@@ -62,6 +67,8 @@ class Config:
     small_max: float
     mid_max: float
     large_max: float
+    max_candidates: int
+    max_candidates_large: int
 
     def __post_init__(self):
         for f in dataclasses.fields(self):
@@ -97,6 +104,10 @@ class Config:
         bands = (self.nano_max, self.micro_max, self.small_max, self.mid_max, self.large_max)
         if not 0 < bands[0] < bands[1] < bands[2] < bands[3] < bands[4]:
             raise ConfigError("market cap bands must be > 0 and increasing (nano < ... < large)")
+        for k in ("max_candidates", "max_candidates_large"):
+            v = getattr(self, k)
+            if v != int(v) or not 1 <= v <= MAX_SCREEN_CANDIDATES:
+                raise ConfigError(f"{k} must be a whole number from 1 to {MAX_SCREEN_CANDIDATES}")
 
 
 def load(path: Path | None = None, overrides: dict | None = None) -> Config:

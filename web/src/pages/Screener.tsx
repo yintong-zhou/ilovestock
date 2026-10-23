@@ -91,7 +91,7 @@ export default function Screener({
             Include large and giant caps: the Market cap rule is skipped, Analysis still fails them on it
           </label>
         </form>
-        {busy && <Message kind="info">Checking each candidate takes a few seconds (up to 100 candidates).</Message>}
+        {busy && <Message kind="info">Checking each candidate takes a few seconds. The maximum number of candidates is in Settings.</Message>}
         {error && <Message kind="error">{error}</Message>}
       </Panel>
 

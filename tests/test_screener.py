@@ -181,6 +181,14 @@ def test_screen_too_many_candidates(monkeypatch):
         screen(FakeProvider({}), CFG, TODAY)
     with pytest.raises(finviz.FinvizError, match="yoy"):
         screen(FakeProvider({}), replace(CFG, growth_basis="qoq"), TODAY)
+    # with large/giant the cap is 200: 101 candidates are searched (data errors here)
+    assert screen(FakeProvider({}), CFG, TODAY, include_large=True).candidates == 101
+    rows += [(f"U{i}", 1e9) for i in range(100)]
+    with pytest.raises(finviz.FinvizError, match="more than 200 micro/small/mid/large/giant"):
+        screen(FakeProvider({}), CFG, TODAY, include_large=True)
+    # both caps come from the config (Settings)
+    with pytest.raises(finviz.FinvizError, match="more than 50 .* raise max_candidates in"):
+        screen(FakeProvider({}), replace(CFG, max_candidates=50), TODAY)
 
 
 def test_screen_reports_finviz_fetch_failure_as_error(monkeypatch):

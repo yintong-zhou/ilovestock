@@ -120,4 +120,6 @@ export interface AppConfig {
   small_max: number
   mid_max: number
   large_max: number
+  max_candidates: number
+  max_candidates_large: number
 }

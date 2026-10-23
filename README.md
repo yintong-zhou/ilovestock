@@ -97,7 +97,7 @@ ilovestock analyze --watchlist reports/screen-2026-10-22.txt
 - Only stocks with complete Finviz data are searched: a stock with a missing Finviz value on a filtered field (or no Finviz market cap) never reaches the candidates, even if Yahoo has it.
 - Dividends and market cap are not filtered on Finviz: its dividend filter uses the forward estimate (the rule uses the last 12 months) and its market cap filter takes a single band. Finviz rows come sorted by market cap instead: large and giant caps are skipped, and the list ends at the first nano cap, with the same bands as the rule.
 - `--include-large` (web: the "Include large and giant caps" box) also searches large and giant caps and skips the Market cap rule, so they can pass. The method is for micro to mid caps: `analyze` still fails them on Market cap, so their verdict stays NO-BUY.
-- A search stops with more than 100 micro/small/mid candidates, or more than 1000 Finviz rows before the first nano cap: tighten the thresholds in the config. Each candidate takes a few seconds. An unreadable Finviz page (changed markup) stops the search with an error, never with a partial list.
+- A search stops with more than `max_candidates` micro/small/mid candidates (default 100; `max_candidates_large`, default 200, with `--include-large`), or more than 1000 Finviz rows before the first nano cap: tighten the thresholds or raise the cap in the config (web: Settings). Each candidate takes a few seconds. An unreadable Finviz page (changed markup) stops the search with an error, never with a partial list.
 - With `growth_basis = "qoq"`, growth is not filtered on Finviz (it only has year-on-year), so more candidates come back.
 
 ### Analyze tickers
@@ -192,6 +192,10 @@ micro_max = 300
 small_max = 2000
 mid_max = 10000
 large_max = 200000
+
+[screener]               # Finviz candidates checked one by one, a few seconds each; 1 to 500
+max_candidates = 100
+max_candidates_large = 200  # with large and giant caps (--include-large)
 ```
 
 > [!IMPORTANT]

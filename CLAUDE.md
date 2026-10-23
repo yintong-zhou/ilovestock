@@ -81,9 +81,10 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
    requested row, be sorted, and have as many parsed rows as tickers; otherwise
    `FinvizError`, never a silent partial list.
 3. `candidates()` skips large/giant caps and stops at the first nano. It uses the same bands as the
-   Market cap rule. Limits: `MAX_CANDIDATES` (100) and `MAX_ROWS` (1000). With `include_large`
-   (`--include-large`, web checkbox) large/giant are kept and the screen skips only the Market cap
-   rule; `analyze` still fails them on it (user's decision).
+   Market cap rule. Limits: config `max_candidates` (100, editable in Settings) and `MAX_ROWS`
+   (1000). With `include_large` (`--include-large`, web checkbox) large/giant are kept, the cap is
+   `max_candidates_large` (200) and the screen skips only the Market cap rule; `analyze` still
+   fails them on it (user's decision).
 4. For each candidate, fetch fundamentals first, then one year of prices (`SCREEN_PERIOD`), and
    apply the exact rules. The stocks that pass are ranked by `quality.py`: ROIC and 1-year
    operating margin change, each turned into a rank percentile; N/D is worst. Quality is

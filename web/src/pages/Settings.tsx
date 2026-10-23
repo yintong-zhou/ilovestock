@@ -35,6 +35,13 @@ const GROUPS: { title: string; fields: [NumKey, string, string?][] }[] = [
       ['large_max', 'Large'],
     ],
   },
+  {
+    title: 'Screener',
+    fields: [
+      ['max_candidates', 'Max candidates', 'Each takes a few seconds: 100 is about 5 minutes. 1 to 500.'],
+      ['max_candidates_large', 'Max candidates with large and giant caps', 'Used when the Screener includes large and giant caps. 1 to 500.'],
+    ],
+  },
 ]
 
 // One grid for every settings panel, so fields line up from panel to panel.
