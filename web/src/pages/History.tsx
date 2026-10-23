@@ -2,7 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { Button, CriteriaTable, Field, inputClass, Message, PageHeader, Panel, RuleGroup, StatusText, VerdictBadge, WatchButton } from '../components'
-import { fmt, groups, when } from '../format'
+import { fmt, groups, toHistory, when } from '../format'
 import type { CriterionResult, HistoryEdit, HistoryRow, Status, Verdict } from '../types'
 
 const VERDICTS: Verdict[] = ['BUY', 'BUY*', 'NO-BUY']
@@ -81,7 +81,7 @@ function TickerList({ rows, view, onView }: { rows: HistoryRow[]; view: View; on
               </thead>
               <tbody>
                 {slice.map(({ ticker, last, count, fundamental, technical }) => (
-                  <tr key={ticker} className="border-b border-line/60 last:border-0 hover:bg-white/5">
+                  <tr key={ticker} onClick={toHistory(ticker)} className="cursor-pointer border-b border-line/60 last:border-0 hover:bg-white/5">
                     <td className="py-3 pr-4">
                       <a href={`#history/${encodeURIComponent(ticker)}`} className="font-semibold text-teal-tint hover:underline">
                         {ticker}

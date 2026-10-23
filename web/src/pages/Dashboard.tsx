@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { Message, PageHeader, Panel, RuleLegend, RuleMatrix, VerdictBadge } from '../components'
-import { groups, latestByTicker, when } from '../format'
+import { groups, latestByTicker, toHistory, when } from '../format'
 import type { HistoryRow } from '../types'
 
 const RECENT = 10
@@ -101,7 +101,8 @@ export default function Dashboard({ onApiError }: { onApiError: (e: unknown) => 
             {rows.slice(0, RECENT).map((r) => {
               const { fundamental, technical } = groups(r.criteria)
               return (
-                <li key={r.ticker} className="flex items-center gap-4 border-b border-line py-3 first:pt-0 last:border-0 last:pb-0">
+                <li key={r.ticker} onClick={toHistory(r.ticker)}
+                  className="-mx-2 flex cursor-pointer items-center gap-4 rounded-sm border-b border-line px-2 py-3 last:border-0 hover:bg-white/5">
                   <a href={`#history/${encodeURIComponent(r.ticker)}`} className="w-16 font-semibold text-teal-tint hover:underline">
                     {r.ticker}
                   </a>

@@ -1,4 +1,21 @@
+import type { MouseEvent } from 'react'
+
 import type { CriterionResult, HistoryRow, Quality } from './types'
+
+/** Row click handler that does what the row's ticker link or button does. The ticker stays the
+ * keyboard target; clicks on other controls and text selections are left alone. */
+export function rowClick(action: () => void) {
+  return (e: MouseEvent) => {
+    if ((e.target as Element).closest('a, button, input, select, textarea') || window.getSelection()?.toString()) return
+    action()
+  }
+}
+
+/** Row click that opens the ticker's History page. */
+export const toHistory = (ticker: string) =>
+  rowClick(() => {
+    window.location.hash = `#history/${encodeURIComponent(ticker)}`
+  })
 
 /** '2026-10-20T15:04:00' -> '2026-10-20 15:04' */
 export const when = (iso: string) => iso.replace('T', ' ').slice(0, 16)

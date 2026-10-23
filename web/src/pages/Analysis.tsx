@@ -15,7 +15,7 @@ import {
   VerdictBadge,
   WatchButton,
 } from '../components'
-import { fmt } from '../format'
+import { fmt, rowClick } from '../format'
 import type { AnalyzeOut, TickerAnalysis } from '../types'
 
 function fundamentalRules(r: TickerAnalysis) {
@@ -150,7 +150,8 @@ export default function Analysis({
                 const isOpen = open === r.ticker
                 return (
                   <tbody key={r.ticker} className="border-b border-line last:border-0">
-                    <tr className={isOpen ? 'bg-well' : 'hover:bg-well/60'}>
+                    <tr onClick={rowClick(() => setOpen(isOpen ? null : r.ticker))}
+                      className={`cursor-pointer ${isOpen ? 'bg-well' : 'hover:bg-well/60'}`}>
                       <td className="px-6 py-3">
                         <button
                           type="button"

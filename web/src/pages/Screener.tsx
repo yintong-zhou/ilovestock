@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { Button, Field, inputClass, Message, PageHeader, Panel } from '../components'
-import { pct, points } from '../format'
+import { pct, points, rowClick } from '../format'
 import type { ScreenHit, ScreenOut } from '../types'
 
 const MAX_RESULTS = 50 // the list goes to Analysis, which takes at most 50 tickers
@@ -115,7 +115,8 @@ export default function Screener({
                   const isOpen = open === h.ticker
                   return (
                     <tbody key={h.ticker} className="border-b border-line last:border-0">
-                      <tr className={isOpen ? 'bg-well' : 'hover:bg-well/60'}>
+                      <tr onClick={rowClick(() => setOpen(isOpen ? null : h.ticker))}
+                        className={`cursor-pointer ${isOpen ? 'bg-well' : 'hover:bg-well/60'}`}>
                         <td className="px-6 py-3 text-muted">{i + 1}</td>
                         <td className="px-6 py-3">
                           <button

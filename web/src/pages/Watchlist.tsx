@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
 import { Button, Message, PageHeader, Panel, RuleGroup, VerdictBadge } from '../components'
-import { fmt, groups, latestByTicker, when } from '../format'
+import { fmt, groups, latestByTicker, toHistory, when } from '../format'
 import type { HistoryRow } from '../types'
 
 const MAX = 50 // watchlist.MAX on the server
@@ -98,7 +98,7 @@ export default function Watchlist({ onApiError }: { onApiError: (e: unknown) => 
                   const working = busy.includes(t)
                   return (
                     <Fragment key={t}>
-                      <tr className="border-b border-line/60">
+                      <tr onClick={toHistory(t)} className="cursor-pointer border-b border-line/60 hover:bg-white/5">
                         <td className="py-3 pr-4">
                           <a href={`#history/${encodeURIComponent(t)}`} className={`font-semibold ${link}`}>{t}</a>
                         </td>
