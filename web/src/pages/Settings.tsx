@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 
-import { api } from '../api'
+import { ApiError, api } from '../api'
 import { Button, Field, inputClass, Message, PageHeader, Panel } from '../components'
 import type { AppConfig } from '../types'
 
@@ -60,7 +60,9 @@ function PinForm({ onApiError }: { onApiError: (e: unknown) => void }) {
       setCurrent('')
       setNext('')
     } catch (err) {
-      setMsg({ kind: 'error', text: (err as Error).message })
+      // 422 = a PIN that is not 4-8 digits (Pydantic's detail is not readable); 401 and 429 keep their text
+      const short = err instanceof ApiError && err.status === 422
+      setMsg({ kind: 'error', text: short ? 'PINs are 4 to 8 digits.' : (err as Error).message })
       onApiError(err)
     }
   }
