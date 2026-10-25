@@ -4,7 +4,6 @@ Listens on 127.0.0.1 only (see cli.serve). Every /api route except the PIN ones 
 The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 """
 
-import dataclasses
 import threading
 from datetime import date, datetime
 from pathlib import Path
@@ -21,7 +20,7 @@ from ilovestock import history, inputs, pdf, screener, watchlist
 from ilovestock.analysis import analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
 from ilovestock.export import SOURCES, data_date
-from ilovestock.models import DISCLAIMER, TickerAnalysis
+from ilovestock.models import DISCLAIMER, CriterionResult, TickerAnalysis, Verdict
 from ilovestock.providers import finviz
 from ilovestock.providers.base import MarketDataProvider
 from ilovestock.providers.cache import CachedProvider
@@ -69,6 +68,25 @@ class ScreenIn(BaseModel):
     include_large: bool = False
 
 
+class HistoryRow(BaseModel):
+    """One saved analysis of one ticker: history.py's row dict."""
+
+    id: str
+    analyzed_at: str
+    data_date: str | None
+    ticker: str
+    verdict: Verdict
+    price: float | None
+    entry: float | None
+    stop: float | None
+    target: float | None
+    shares: int | None
+    reasons: list[str]
+    criteria: list[CriterionResult]
+    note: str
+    edited_at: str | None
+
+
 class PdfIn(BaseModel):
     title: Literal["History", "Watchlist"]
     ids: list[str] = Field(min_length=1, max_length=1000)  # the analyses shown on the page
@@ -100,7 +118,10 @@ def create_app(
 
     @app.middleware("http")
     async def small_bodies(request: Request, call_next):
-        # ponytail: trusts Content-Length; browsers and fetch() always send it for these bodies
+        # The server reads exactly Content-Length bytes, so that header bounds the body. A chunked
+        # body has no length up front: refused (fetch() always sends Content-Length here).
+        if "transfer-encoding" in request.headers:
+            return PlainTextResponse("Length required", status_code=411)
         if int(request.headers.get("content-length") or 0) > MAX_BODY:
             return PlainTextResponse("Request too large", status_code=413)
         return await call_next(request)
@@ -168,21 +189,22 @@ def create_app(
         login(response)
 
     @app.get("/api/config", dependencies=[Depends(session)])
-    def get_config() -> dict:
+    def get_config() -> cfgmod.Config:
         try:
-            return dataclasses.asdict(cfgmod.load(cfg_path))
+            return cfgmod.load(cfg_path)
         except cfgmod.ConfigError as e:
             raise HTTPException(422, str(e)) from e
 
+    # Config and history edits come in as dicts: config.py and history.py check them with messages
+    # the page can show (Pydantic's 422 detail is a list). Responses are typed.
     @app.put("/api/config", dependencies=[Depends(session)])
-    def put_config(values: dict) -> dict:
+    def put_config(values: dict) -> cfgmod.Config:
         try:
             cfg = cfgmod.load(cfg_path, values)
         except (cfgmod.ConfigError, TypeError) as e:
             raise HTTPException(422, str(e)) from e
-        cfg_path.parent.mkdir(parents=True, exist_ok=True)
-        cfg_path.write_text(cfgmod.dump(cfg), encoding="utf-8")
-        return dataclasses.asdict(cfg)
+        cfgmod.save(cfg, cfg_path)
+        return cfg
 
     @app.post("/api/analyze", dependencies=[Depends(session)])
     def analyze(body: AnalyzeIn) -> AnalyzeOut:
@@ -236,11 +258,11 @@ def create_app(
         )
 
     @app.get("/api/history", dependencies=[Depends(session)])
-    def history_rows() -> list[dict]:
+    def history_rows() -> list[HistoryRow]:
         return history.read(history_path)
 
     @app.patch("/api/history/{row_id}", dependencies=[Depends(session)])
-    def history_edit(row_id: str, changes: dict) -> dict:
+    def history_edit(row_id: str, changes: dict) -> HistoryRow:
         try:
             return history.update(row_id, changes, history_path)
         except history.HistoryError as e:
@@ -261,10 +283,12 @@ def create_app(
 
     @app.post("/api/history/pdf", dependencies=[Depends(session)])
     def history_pdf(body: PdfIn) -> Response:
+        if len(set(body.ids)) < len(body.ids):
+            raise HTTPException(422, "Each analysis can appear only once")
         by_id = {r["id"]: r for r in history.read(history_path)}
-        rows = [by_id[i] for i in body.ids if i in by_id]
-        if not rows:
-            raise HTTPException(404, "No saved analysis matches")
+        if missing := [i for i in body.ids if i not in by_id]:  # deleted since the page loaded
+            raise HTTPException(404, f"Not in the history, reload the page: {', '.join(missing)}")
+        rows = [by_id[i] for i in body.ids]
         return Response(pdf.render(rows, body.title, datetime.now()), media_type="application/pdf")
 
     # Each route returns the whole list: the page shows exactly what is on disk.

@@ -27,6 +27,9 @@ FIELDS = [
 NUMBERS = ("price", "entry", "stop", "target")
 EDITABLE = {"verdict", *NUMBERS, "shares", "note"}
 MAX_NOTE = 1000
+# Excel runs a note starting with =+-@ (or tab/CR) as a formula: the CSV gets a leading ' (shown as
+# text). A note starting with ' gets one too, so reading strips exactly one.
+FORMULA = ("=", "+", "-", "@", "\t", "\r", "'")
 # Excel reads UTF-8 only with a BOM; utf-8-sig also reads files without one.
 ENCODING = "utf-8-sig"
 _lock = threading.Lock()  # threads of one process (web routes run in a thread pool)
@@ -91,6 +94,8 @@ def _to_csv(row: dict) -> dict:
     out = {k: ("" if row[k] is None else row[k]) for k in FIELDS}
     out["reasons"] = json.dumps(row["reasons"])
     out["criteria"] = json.dumps(row["criteria"])
+    if out["note"].startswith(FORMULA):
+        out["note"] = "'" + out["note"]
     return out
 
 
@@ -101,7 +106,8 @@ def _from_csv(raw: dict) -> dict:
     row["shares"] = int(row["shares"]) if row["shares"] else None
     row["reasons"] = json.loads(raw["reasons"] or "[]")
     row["criteria"] = json.loads(raw["criteria"] or "[]")
-    row["note"] = raw.get("note") or ""
+    note = raw.get("note") or ""
+    row["note"] = note[1:] if note.startswith("'") else note
     return row
 
 

@@ -1,5 +1,6 @@
 """Analysis history CSV: append from CLI/web, read typed rows, edit and delete from the web."""
 
+import csv
 import os
 import time
 from datetime import date, datetime
@@ -77,6 +78,17 @@ def test_edit_rejects_invalid(path, changes):
     rid = history.read(path)[0]["id"]
     with pytest.raises(history.HistoryError):
         history.update(rid, changes, path)
+
+
+def test_note_never_runs_as_a_spreadsheet_formula(path):
+    history.append([AAA], NOW, path)
+    rid = history.read(path)[0]["id"]
+    for note in ('=HYPERLINK("http://x")', "-1+2", "@SUM(A1)", "'quoted", "plain"):
+        history.update(rid, {"note": note}, path)
+        with path.open(newline="", encoding=history.ENCODING) as f:
+            cell = next(csv.DictReader(f))["note"]
+        assert cell == (note if note == "plain" else "'" + note)  # Excel shows it as text
+        assert history.read(path)[0]["note"] == note  # the app gets it back unchanged
 
 
 def test_edit_can_clear_a_number(path):

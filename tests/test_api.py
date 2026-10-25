@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
+from ilovestock import config as cfgmod
 from ilovestock import inputs, screener, watchlist
 from ilovestock.api import pin as pinmod
 from ilovestock.api.app import create_app
@@ -121,6 +122,20 @@ def test_config_read_and_update(client, tmp_path):
     assert client.put("/api/config", json={"nope": 1}).status_code == 422
 
 
+def test_config_save_never_leaves_half_a_file(client, tmp_path, monkeypatch):
+    unlocked(client)
+    client.put("/api/config", json={"capital": 15000})
+    before = (tmp_path / "config.toml").read_text()
+
+    def crash(*a):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(cfgmod.os, "replace", crash)
+    with pytest.raises(OSError):
+        client.put("/api/config", json={"capital": 9000})
+    assert (tmp_path / "config.toml").read_text() == before
+
+
 def test_analyze(client):
     unlocked(client)
     r = client.post("/api/analyze", json={"tickers": ["hzo", "WLST"]})
@@ -189,10 +204,14 @@ def test_history_pdf(client):
     unlocked(client)
     client.post("/api/analyze", json={"tickers": ["HZO"]})
     rid = client.get("/api/history").json()[0]["id"]
-    r = client.post("/api/history/pdf", json={"title": "History", "ids": ["nope", rid]})
+    r = client.post("/api/history/pdf", json={"title": "History", "ids": [rid]})
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
     assert r.content.startswith(b"%PDF")
     assert client.post("/api/history/pdf", json=body).status_code == 404  # no id matches
+    r = client.post("/api/history/pdf", json={"title": "History", "ids": ["nope", rid]})
+    assert r.status_code == 404 and "nope" in r.json()["detail"]  # never a partial PDF
+    twice = {"title": "History", "ids": [rid, rid]}
+    assert client.post("/api/history/pdf", json=twice).status_code == 422
     assert client.post("/api/history/pdf", json={"title": "History", "ids": []}).status_code == 422
     assert client.post("/api/history/pdf", json={"title": "Other", "ids": [rid]}).status_code == 422
 
@@ -217,6 +236,8 @@ def test_pin_input_checked_before_hashing(client):
     assert client.post("/api/pin/unlock", json={"pin": "1" * 100}).status_code == 422
     big = "x" * (70 * 1024)
     assert client.post("/api/pin/unlock", json={"pin": big}).status_code == 413
+    chunked = client.post("/api/pin/unlock", content=iter([big.encode()]))
+    assert chunked.status_code == 411  # no Content-Length: the size is not known up front
 
 
 # --- screener ---

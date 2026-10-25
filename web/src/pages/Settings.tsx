@@ -44,6 +44,9 @@ const GROUPS: { title: string; fields: [NumKey, string, string?][] }[] = [
   },
 ]
 
+// Whole numbers from 1 to 500 (config.py MAX_SCREEN_CANDIDATES); every other field takes decimals.
+const WHOLE: NumKey[] = ['max_candidates', 'max_candidates_large']
+
 // One grid for every settings panel, so fields line up from panel to panel.
 const GRID = 'grid gap-6 sm:grid-cols-2 sm:items-start lg:grid-cols-3'
 
@@ -143,7 +146,8 @@ export default function Settings({ onApiError }: { onApiError: (e: unknown) => v
               <div className={GRID}>
                 {g.fields.map(([key, label, hint]) => (
                   <Field key={key} label={label} hint={hint}>
-                    <input className={inputClass} type="number" step="any" required value={cfg[key]}
+                    <input className={inputClass} type="number" required value={cfg[key]}
+                      {...(WHOLE.includes(key) ? { step: 1, min: 1, max: 500 } : { step: 'any' })}
                       onChange={(e) => setCfg({ ...cfg, [key]: e.target.valueAsNumber })} />
                   </Field>
                 ))}

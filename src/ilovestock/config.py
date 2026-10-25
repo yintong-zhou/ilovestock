@@ -2,6 +2,8 @@
 
 import dataclasses
 import math
+import os
+import threading
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +14,7 @@ MAX_POSITION_PCT = 10.0  # method: a single stock is always at most 10% of the p
 MAX_SCREEN_CANDIDATES = 500  # a screen this large takes about 25 minutes
 ENTRY_MODES = ("breakout", "pullback", "restart")
 GROWTH_BASES = ("qoq", "yoy")
+_lock = threading.Lock()  # web routes run in a thread pool: two tabs may save at once
 
 TEMPLATE = """\
 # ilovestock config. CLI options override these values.
@@ -130,6 +133,16 @@ def load(path: Path | None = None, overrides: dict | None = None) -> Config:
         if v is not None:
             values[k] = v
     return Config(**values)
+
+
+def save(cfg: Config, path: Path | None = None) -> None:
+    """Write through a temp file: a crash mid-write never leaves a half config."""
+    path = path or CONFIG_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with _lock:
+        tmp.write_text(dump(cfg), encoding="utf-8")
+        os.replace(tmp, path)
 
 
 def dump(cfg: Config) -> str:
