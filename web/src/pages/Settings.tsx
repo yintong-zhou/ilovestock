@@ -135,8 +135,8 @@ export default function Settings({ onApiError }: { onApiError: (e: unknown) => v
               <Field label="Growth basis">
                 <select className={inputClass} value={cfg.growth_basis}
                   onChange={(e) => setCfg({ ...cfg, growth_basis: e.target.value as AppConfig['growth_basis'] })}>
-                  <option value="yoy">Year over year (Finviz)</option>
                   <option value="qoq">Quarter over quarter (Yahoo)</option>
+                  <option value="yoy">Year over year (Finviz)</option>
                 </select>
               </Field>
             </div>

@@ -190,8 +190,9 @@ def delete(path: Path | None = None, ids: list[str] | None = None, ticker: str |
     path = path or HISTORY_PATH
     with _locked(path):
         rows = _read(path)
-        if ids and not set(ids) <= {r["id"] for r in rows}:
+        drop = set(ids or [])
+        if not drop <= {r["id"] for r in rows}:
             raise KeyError(ids)
-        keep = [r for r in rows if r["id"] not in (ids or []) and r["ticker"] != ticker]
+        keep = [r for r in rows if r["id"] not in drop and r["ticker"] != ticker]
         _write(keep, path)
     return len(rows) - len(keep)

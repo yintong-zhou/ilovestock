@@ -198,6 +198,19 @@ def test_history_api(client):
     assert client.get("/api/history").json() == []
 
 
+def test_history_bulk_delete(client):
+    assert client.post("/api/history/delete", json={"ids": ["x"]}).status_code == 401  # locked
+    unlocked(client)
+    for _ in range(3):
+        client.post("/api/analyze", json={"tickers": ["HZO"]})
+    ids = [r["id"] for r in client.get("/api/history").json()]
+    r = client.post("/api/history/delete", json={"ids": [ids[0], "nope"]})
+    assert r.status_code == 404 and len(client.get("/api/history").json()) == 3  # all or nothing
+    assert client.post("/api/history/delete", json={"ids": ids[:2]}).status_code == 204
+    assert [r["id"] for r in client.get("/api/history").json()] == ids[2:]
+    assert client.post("/api/history/delete", json={"ids": []}).status_code == 422
+
+
 def test_history_pdf(client):
     body = {"title": "History", "ids": ["x"]}
     assert client.post("/api/history/pdf", json=body).status_code == 401  # locked

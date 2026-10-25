@@ -15,6 +15,7 @@ runner = CliRunner()
 def test_precedence_default_file_cli(tmp_path):
     path = tmp_path / "c.toml"
     assert config.load(path).capital == 20000  # built-in default
+    assert config.load(path).growth_basis == "qoq"  # the method: vs the previous quarter
     path.write_text("[portfolio]\ncapital = 5000\nrisk_pct = 0.5\n")
     cfg = config.load(path)
     assert (cfg.capital, cfg.risk_pct, cfg.r_multiple) == (5000, 0.5, 3)  # file > default
@@ -108,7 +109,7 @@ def test_analyze_combines_three_inputs(offline):
 def test_analyze_detail_shows_criteria(offline):
     result = runner.invoke(cli.app, ["analyze", "HZO", "--detail"])
     assert result.exit_code == 0, result.output
-    for text in ("Sales growth YOY", "source: Finviz", "DMI 18d", "Trade plan", "Next earnings"):
+    for text in ("Sales growth QOQ", "source: Finviz", "DMI 18d", "Trade plan", "Next earnings"):
         assert text in result.output
 
 

@@ -87,6 +87,10 @@ class HistoryRow(BaseModel):
     edited_at: str | None
 
 
+class DeleteIn(BaseModel):
+    ids: list[str] = Field(min_length=1)  # the analyses ticked on the page; MAX_BODY: ~4,000 ids
+
+
 class PdfIn(BaseModel):
     title: Literal["History", "Watchlist"]
     ids: list[str] = Field(min_length=1, max_length=1000)  # the analyses shown on the page
@@ -280,6 +284,13 @@ def create_app(
     @app.delete("/api/history", status_code=204, dependencies=[Depends(session)])
     def history_delete_ticker(ticker: str) -> None:
         history.delete(history_path, ticker=ticker.upper())
+
+    @app.post("/api/history/delete", status_code=204, dependencies=[Depends(session)])
+    def history_delete_many(body: DeleteIn) -> None:
+        try:  # all or nothing: one unknown id (deleted elsewhere) deletes none
+            history.delete(history_path, ids=body.ids)
+        except KeyError as e:
+            raise HTTPException(404, "Analysis not found in the history: reload the page") from e
 
     @app.post("/api/history/pdf", dependencies=[Depends(session)])
     def history_pdf(body: PdfIn) -> Response:

@@ -49,6 +49,7 @@ export const api = {
   deleteHistory: (id: string) => request<void>('DELETE', `/api/history/${encodeURIComponent(id)}`),
   deleteTickerHistory: (ticker: string) =>
     request<void>('DELETE', `/api/history?ticker=${encodeURIComponent(ticker)}`),
+  deleteHistoryMany: (ids: string[]) => request<void>('POST', '/api/history/delete', { ids }),
   historyPdf: (title: 'History' | 'Watchlist', ids: string[]) =>
     send('POST', '/api/history/pdf', { title, ids }).then((r) => r.blob()),
   watchlist: () => request<string[]>('GET', '/api/watchlist'),

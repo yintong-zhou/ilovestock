@@ -98,7 +98,7 @@ ilovestock analyze --watchlist reports/screen-2026-10-22.txt
 - Dividends and market cap are not filtered on Finviz: its dividend filter uses the forward estimate (the rule uses the last 12 months) and its market cap filter takes a single band. Finviz rows come sorted by market cap instead: large and giant caps are skipped, and the list ends at the first nano cap, with the same bands as the rule.
 - `--include-large` (web: the "Include large and giant caps" box) also searches large and giant caps and skips the Market cap rule, so they can pass. The method is for micro to mid caps: `analyze` still fails them on Market cap, so their verdict stays NO-BUY.
 - A search stops with more than `max_candidates` micro/small/mid candidates (default 100; `max_candidates_large`, default 200, with `--include-large`), or more than 1000 Finviz rows before the first nano cap: tighten the thresholds or raise the cap in the config (web: Settings). Each candidate takes a few seconds. An unreadable Finviz page (changed markup) stops the search with an error, never with a partial list.
-- With `growth_basis = "qoq"`, growth is not filtered on Finviz (it only has year-on-year), so more candidates come back.
+- With `growth_basis = "qoq"` (the default), growth is not filtered on Finviz (it only has year-on-year), so more candidates come back and a search reaches `max_candidates` sooner. `growth_basis = "yoy"` also filters growth on Finviz.
 
 ### Analyze tickers
 
@@ -130,7 +130,7 @@ A watchlist is a text or CSV file with one ticker per line. Lines starting with 
 | `--risk-pct N` | Max loss per trade, % of capital (above 2 is rejected) |
 | `--max-position-pct N` | Max weight per stock, % of capital |
 | `--r-multiple N` | Take profit as a multiple of R (below 2, the trade is discarded) |
-| `--growth-basis yoy\|qoq` | Growth vs the same quarter last year (Finviz, default), or vs the previous quarter (Yahoo) |
+| `--growth-basis qoq\|yoy` | Growth vs the previous quarter (Yahoo, default), or vs the same quarter last year (Finviz) |
 | `--entry-mode breakout\|pullback\|restart` | Entry point used for the trade plan |
 | `--allow-missing` | `N/D` fundamental criteria don't block: the verdict is **BUY\*** (incomplete data) instead of BUY, with the `N/D` criteria listed |
 | `--max-tickers` | Refuse runs with more tickers than this (default 50, the web app's limit) |
@@ -155,7 +155,7 @@ Every file states the data date, the data sources and the disclaimer.
 
 Every analysis, from the terminal or the web app, adds one row per ticker to `~/.config/ilovestock/history.csv`: date, data date, verdict, price, entry, stop, target, shares, reasons, and every criterion with its status and value (as JSON, since criterion names can change). Tickers with a data error are not saved. The file opens in Excel.
 
-In the web app, the **History** page lists the analyzed tickers and, for each one, every analysis with what changed from the previous one (verdict, criteria, price). There you can add a note, edit verdict, price and levels (the analysis is then marked *edited*), and delete one analysis or a ticker's whole history.
+In the web app, the **History** page lists the analyzed tickers and, for each one, every analysis with what changed from the previous one (verdict, criteria, price). There you can add a note, edit verdict, price and levels (the analysis is then marked *edited*), and delete one analysis or a ticker's whole history. To delete several tickers at once, tick them in the list (the box in the header ticks the page) and press **Delete selected**: only tickers shown by the active filter are deleted.
 
 **Download PDF** on the History page (the tickers of the active filter, every page) and on the Watchlist page builds a PDF from the saved analyses, with no new download: a summary table, then one page per ticker with every criterion (value, threshold, status, note), the trade plan, the reasons and your note. Every page carries the disclaimer. Watchlist tickers never analyzed are left out. The PDF uses the standard Helvetica font, so characters outside Latin-1 become an ASCII stand-in (`→` becomes `->`) or `?`.
 
@@ -180,7 +180,7 @@ r_multiple = 3           # take profit in R; below 2 -> trade discarded
 entry_mode = "breakout"  # breakout | pullback | restart
 
 [fundamental]
-growth_basis = "yoy"     # yoy (Finviz) | qoq (Yahoo)
+growth_basis = "qoq"     # qoq (Yahoo) | yoy (Finviz)
 sales_growth_min = 20
 eps_growth_min = 15
 roe_min = 15
@@ -261,16 +261,16 @@ Weekly criteria use completed weeks only: a breakout counts once the week has cl
 
 | Data | Source |
 |---|---|
-| Sales and EPS growth (YoY), ROE, market cap, dividend yield, next earnings date, institutional ownership and transactions | Finviz via `finviz`; Yahoo Finance as fallback for each missing field |
+| Sales and EPS growth YoY (for `--growth-basis yoy`), ROE, market cap, dividend yield, next earnings date, institutional ownership and transactions | Finviz via `finviz`; Yahoo Finance as fallback for each missing field |
 | Daily adjusted prices, dividend history, S&P 500 (`^GSPC`) | Yahoo Finance via `yfinance` (Finviz has no price history) |
-| Quarterly sales and EPS (for `--growth-basis qoq`) | Yahoo Finance via `yfinance` |
+| Quarterly sales and EPS (growth with the default `qoq` basis) | Yahoo Finance via `yfinance` |
 | Candidate tickers | Finviz screener URL |
 
 Each criterion's note shows where its value came from (`source: Finviz` or `source: Yahoo`).
 
 > [!NOTE]
 > - Neither source is official. Either can block requests or change its format without notice. Prices and fundamentals are cached for one day in `~/.cache/ilovestock`.
-> - Finviz "Sales Q/Q" and "EPS Q/Q" compare with the same quarter last year, so the default growth basis is `yoy`. This is a deliberate deviation: the method defines growth vs the previous quarter. Use `--growth-basis qoq` to apply the method's definition, computed from Yahoo quarters (usually only 4–5 are available).
+> - The default growth basis is `qoq`, the method's definition: the last quarter vs the previous one, computed from Yahoo quarters (usually only 4–5 are available). It shows the latest change, but it moves with seasonal businesses (e.g. retail around the holidays). Finviz "Sales Q/Q" and "EPS Q/Q" actually compare with the same quarter last year: they are used with `--growth-basis yoy`.
 > - Finviz shows the earnings date without a year, and keeps the last report date until the next one is announced. A past date is used as the last report (for the wait after earnings) and Yahoo's date is used as the next one.
 > - Finviz shows `-` for both "no dividend" and "missing". In that case the dividend yield is computed from Yahoo's dividend history.
 > - The `finviz` 2.0.0 screener no longer parses the current Finviz site, so ilovestock reads ticker links from the screener pages itself.

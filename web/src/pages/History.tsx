@@ -22,18 +22,22 @@ const PAGE_SIZES = [25, 50]
 /** Ticker list state, kept by History: opening a ticker and coming back keeps filter and page. */
 type View = { filter: Filter; size: number; page: number }
 
+const CHECKBOX = 'size-4 cursor-pointer accent-teal align-middle'
+
 const allPass = (items: CriterionResult[]) => items.length > 0 && items.every((c) => c.status === 'PASS')
 
 function keep(filter: Filter, f: boolean, t: boolean) {
   return { 'All tickers': true, 'Fundamentals all PASS': f, 'Technical all PASS': t, Both: f && t }[filter]
 }
 
-function TickerList({ rows, view, onView, onPdf }: {
+function TickerList({ rows, view, onView, onPdf, onDelete }: {
   rows: HistoryRow[]
   view: View
   onView: (v: View) => void
   onPdf: (ids: string[]) => void
+  onDelete: (ids: string[]) => Promise<void>
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const tickers = [...byTicker(rows)]
     .map(([ticker, list]) => ({ ticker, last: list.at(-1)!, count: list.length, ...groups(list.at(-1)!.criteria) }))
     .sort((a, b) => b.last.analyzed_at.localeCompare(a.last.analyzed_at))
@@ -42,6 +46,28 @@ function TickerList({ rows, view, onView, onPdf }: {
   const page = Math.min(view.page, pages - 1) // a delete can leave the page past the end
   const start = page * view.size
   const slice = shown.slice(start, start + view.size)
+
+  // Only tickers the active filter shows count: a filter change never deletes hidden ones.
+  const chosen = new Set(shown.filter((t) => selected.has(t.ticker)).map((t) => t.ticker))
+  const onPage = slice.map((t) => t.ticker)
+  const pageAll = onPage.every((t) => selected.has(t))
+  const pageSome = onPage.some((t) => selected.has(t))
+  function toggle(list: string[], on: boolean) {
+    const next = new Set(selected)
+    for (const t of list) {
+      if (on) next.add(t)
+      else next.delete(t)
+    }
+    setSelected(next)
+  }
+  function remove() {
+    // the ids on screen, not the tickers: an analysis saved meanwhile (e.g. from the CLI) stays
+    const ids = rows.filter((r) => chosen.has(r.ticker)).map((r) => r.id)
+    const what = chosen.size === 1 ? [...chosen][0] : `${chosen.size} tickers`
+    if (window.confirm(`Delete all ${ids.length} analyses of ${what}? This cannot be undone.`))
+      onDelete(ids).then(() => setSelected(new Set()), () => {})
+  }
+
   return (
     <Panel title="Analyzed tickers" aside={`${rows.length} analyses`}>
       <div className="mb-4 flex flex-wrap items-center gap-4">
@@ -65,6 +91,9 @@ function TickerList({ rows, view, onView, onPdf }: {
         <Button type="button" variant="quiet" disabled={shown.length === 0} onClick={() => onPdf(shown.map((t) => t.last.id))}>
           Download PDF
         </Button>
+        <Button type="button" variant="quiet" className="hover:border-fail hover:text-fail" disabled={chosen.size === 0} onClick={remove}>
+          Delete selected{chosen.size > 0 && ` (${chosen.size})`}
+        </Button>
       </div>
       {shown.length === 0 ? (
         <p className="text-muted">
@@ -79,6 +108,11 @@ function TickerList({ rows, view, onView, onPdf }: {
             <table className="w-full text-left text-sm">
               <thead className="text-muted">
                 <tr className="border-b border-line">
+                  <th className="w-8 py-2 pr-2 font-normal">
+                    <input type="checkbox" className={CHECKBOX} aria-label="Select the tickers on this page"
+                      checked={pageAll} ref={(el) => { if (el) el.indeterminate = pageSome && !pageAll }}
+                      onChange={(e) => toggle(onPage, e.target.checked)} />
+                  </th>
                   <th className="py-2 pr-4 font-normal">Ticker</th>
                   <th className="py-2 pr-4 font-normal">Last verdict</th>
                   <th className="py-2 pr-4 font-normal">Fundamental</th>
@@ -90,6 +124,10 @@ function TickerList({ rows, view, onView, onPdf }: {
               <tbody>
                 {slice.map(({ ticker, last, count, fundamental, technical }) => (
                   <tr key={ticker} onClick={toHistory(ticker)} className="cursor-pointer border-b border-line/60 last:border-0 hover:bg-white/5">
+                    <td className="py-3 pr-2">
+                      <input type="checkbox" className={CHECKBOX} aria-label={`Select ${ticker}`}
+                        checked={selected.has(ticker)} onChange={(e) => toggle([ticker], e.target.checked)} />
+                    </td>
                     <td className="py-3 pr-4">
                       <a href={`#history/${encodeURIComponent(ticker)}`} className="font-semibold text-teal-tint hover:underline">
                         {ticker}
@@ -323,7 +361,8 @@ export default function History({ ticker, onApiError }: { ticker: string; onApiE
       {error && <Message kind="error">{error}</Message>}
       {rows === null ? null : !ticker ? (
         rows.length ? (
-          <TickerList rows={rows} view={view} onView={setView} onPdf={pdf} />
+          <TickerList rows={rows} view={view} onView={setView} onPdf={pdf}
+            onDelete={(ids) => act(() => api.deleteHistoryMany(ids))} />
         ) : (
           <Panel>
             <p className="text-muted">No analyses yet. Run one from <a href="#analysis" className="text-teal-tint hover:underline">Analysis</a> and it appears here.</p>
