@@ -102,7 +102,7 @@ class ScreenHit:
 
 @dataclass
 class ScreenResult:
-    candidates: int  # micro/small/mid stocks from the Finviz pre-filter
+    candidates: int  # Finviz pre-filter: micro/small/mid, plus large/giant with include_large
     passed: int  # every fundamental and earnings criterion PASS
     errors: list[str]  # tickers skipped for data errors
     hits: list[ScreenHit]  # best `max_results` by quality score
