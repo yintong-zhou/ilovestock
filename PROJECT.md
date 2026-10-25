@@ -138,7 +138,7 @@ r_multiple = 3           # take profit; below 2 → trade discarded
 entry_mode = "breakout"  # breakout | pullback | restart
 
 [fundamental]
-growth_basis = "yoy"     # yoy | qoq (see D2)
+growth_basis = "qoq"     # qoq | yoy (see D2)
 sales_growth_min = 20
 eps_growth_min = 15
 roe_min = 15
@@ -213,7 +213,7 @@ No deadlines (spare-time development). Ordered by dependency.
 ## Open decisions
 **Before M3-M4:**
 - D1 ROE: the method text says "ROE > 15% Q/Q" but the screener table says "ROE > 15%". Level or change? **Decided: level (ROE > 15%).**
-- D2 Q/Q definition: method = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. **Decided (2026-10-20): default `yoy` from Finviz, option `qoq` from yfinance.**
+- D2 Q/Q definition: method = vs previous quarter; Finviz fields are YoY, so Finviz data is YoY; `qoq` needs yfinance quarterly financials. **Decided (2026-10-20): default `yoy` from Finviz, option `qoq` from yfinance.** **Changed (2026-10-25, user): default `qoq` (the method's definition, more useful to buy now), option `yoy` from Finviz.**
 - D3 Missing institutional data (ticker lacks it or the library fails). Proposal: criterion `N/D`, verdict NO-BUY reason "missing data", option `--allow-missing` to skip knowingly. **Decided: as proposed; with `--allow-missing` the verdict is `BUY*` (incomplete data), never a plain BUY.**
 - D4 Market cap thresholds: the method names the bands (nano, micro, small, mid, large, giant) without numbers in the material read. Proposal: start from Finviz bands, make them configurable.
 - D5 Stop algorithm for "most important previous low". Proposal: low of the consolidation or last pivot low over N weeks.

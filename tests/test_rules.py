@@ -22,6 +22,7 @@ from ilovestock.rules.technical import (
 from ilovestock.rules.verdict import verdict
 
 CFG = load(Path("does-not-exist.toml"))
+YOY = replace(CFG, growth_basis="yoy")
 
 
 def good_fundamentals(**kw) -> Fundamentals:
@@ -89,19 +90,19 @@ def test_all_fundamentals_pass():
     ],
 )
 def test_fundamental_thresholds(field, value, prefix, status):
-    results = fundamental(good_fundamentals(**{field: value}), prices(), CFG)
+    results = fundamental(good_fundamentals(**{field: value}), prices(), YOY)
     assert by_name(results, prefix).status == status
 
 
 def test_qoq_growth_uses_yahoo_quarters_not_finviz():
     f = good_fundamentals(sales=[110.0, 100.0], sales_growth_yoy_pct=50.0)
-    r = by_name(fundamental(f, prices(), replace(CFG, growth_basis="qoq")), "Sales growth")
+    r = by_name(fundamental(f, prices(), CFG), "Sales growth QOQ")  # the default
     assert (r.status, r.value, r.note) == (Status.FAIL, 10.0, "source: Yahoo")
 
 
 def test_yoy_growth_prefers_finviz():
     f = good_fundamentals(sales_growth_yoy_pct=25.0)
-    r = by_name(fundamental(f, prices(), CFG), "Sales growth YOY")
+    r = by_name(fundamental(f, prices(), YOY), "Sales growth YOY")
     assert (r.status, r.value, r.note) == (Status.PASS, 25.0, "source: Finviz")
 
 

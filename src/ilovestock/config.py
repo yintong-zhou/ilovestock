@@ -29,7 +29,7 @@ r_multiple = 3           # take profit in R; below 2 -> trade discarded
 entry_mode = "breakout"  # breakout | pullback | restart
 
 [fundamental]
-growth_basis = "yoy"     # yoy (Finviz, vs same quarter a year ago) | qoq (Yahoo, vs last quarter)
+growth_basis = "qoq"     # qoq (Yahoo, vs last quarter: the method) | yoy (Finviz, vs a year ago)
 sales_growth_min = 20
 eps_growth_min = 15
 roe_min = 15

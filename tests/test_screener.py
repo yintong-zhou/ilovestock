@@ -18,12 +18,13 @@ from tests.test_rules import good_fundamentals, prices
 
 DEFAULT = load(Path("does-not-exist.toml"))
 CFG = DEFAULT
+YOY = replace(DEFAULT, growth_basis="yoy")  # the only basis Finviz can filter growth on
 TODAY = date(2026, 10, 22)
 
 
 # --- Finviz pre-filter ---
-def test_filters_default_config():
-    assert finviz_filters(DEFAULT) == [
+def test_filters_yoy_config():
+    assert finviz_filters(YOY) == [
         "fa_salesqoq_o20",
         "fa_epsqoq_o15",
         "fa_roe_o15",
@@ -33,9 +34,7 @@ def test_filters_default_config():
 
 
 def test_filters_take_the_loosest_bucket():
-    cfg = replace(
-        DEFAULT, sales_growth_min=22, eps_growth_min=12, roe_min=3, institutional_own_max=85
-    )
+    cfg = replace(YOY, sales_growth_min=22, eps_growth_min=12, roe_min=3, institutional_own_max=85)
     f = finviz_filters(cfg)
     assert "fa_salesqoq_o20" in f and "fa_epsqoq_o10" in f and "sh_instown_u90" in f
     assert not any(x.startswith("fa_roe") for x in f)
@@ -46,12 +45,12 @@ def test_filters_take_the_loosest_bucket():
 
 
 def test_filters_qoq_leaves_growth_out():
-    f = finviz_filters(replace(DEFAULT, growth_basis="qoq"))
+    f = finviz_filters(DEFAULT)  # default qoq: Finviz has only year-on-year growth
     assert not any(x.startswith(("fa_salesqoq", "fa_epsqoq")) for x in f)
 
 
 def test_screener_url_has_no_country_filter():
-    url = screener_url(DEFAULT)
+    url = screener_url(YOY)
     assert url.startswith("https://finviz.com/screener.ashx?v=111&f=fa_salesqoq_o20,")
     assert "geo_" not in url and url.endswith("&o=-marketcap")
 
@@ -64,7 +63,7 @@ def applied_filters(html: str) -> set[str]:
 def test_finviz_accepts_every_generated_filter():
     # Finviz silently ignores unknown codes: a code missing from the applied list is wrong
     html = (FIX / "finviz_screener_default.html").read_text(encoding="utf-8")
-    shown = {":".join(code.rsplit("_", 1)) for code in finviz_filters(DEFAULT)}
+    shown = {":".join(code.rsplit("_", 1)) for code in finviz_filters(YOY)}  # YOY: every code
     assert shown <= applied_filters(html)
 
 
