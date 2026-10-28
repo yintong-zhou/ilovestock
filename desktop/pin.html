@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- First start: choose the PIN. It goes to `ilovestock serve` on stdin, never over HTTP. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src file:; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+    />
+    <title>iLoveStock</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b3d62;
+        color: #eef3f6; font: 16px "Source Sans 3", "Segoe UI", sans-serif; }
+      form { width: 320px; padding: 32px; border-radius: 6px; background: #16232e; }
+      .brand { display: flex; align-items: center; gap: 8px; font: 700 20px Merriweather, Georgia, serif; }
+      h1 { margin: 32px 0 8px; font-size: 20px; }
+      p { margin: 0; color: #a9b8c4; }
+      label { display: block; margin: 24px 0 8px; font-size: 14px; font-weight: 600; }
+      input { box-sizing: border-box; width: 100%; height: 48px; border: 1px solid #3a4b58; border-radius: 4px;
+        background: #0f1a22; color: #eef3f6; font-size: 22px; letter-spacing: 0.4em; text-align: center; }
+      input:focus { outline: 2px solid #2e9e5b; }
+      .error { margin-top: 16px; color: #ff8a80; }
+      button { width: 100%; height: 44px; margin-top: 24px; border: 0; border-radius: 4px; background: #2e9e5b;
+        color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <form id="form" novalidate>
+      <div class="brand"><img src="logo.png" alt="" width="32" height="32" />iLoveStock</div>
+      <h1>Choose a PIN</h1>
+      <p>4 to 8 digits. You enter it each time you open the app.</p>
+      <label for="pin">PIN</label>
+      <input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" autofocus />
+      <label for="again">Repeat the PIN</label>
+      <input id="again" type="password" inputmode="numeric" maxlength="8" autocomplete="off" />
+      <p id="error" class="error" role="alert" hidden></p>
+      <button type="submit">Save PIN</button>
+    </form>
+    <script>
+      const $ = (id) => document.getElementById(id)
+      const show = (text) => {
+        $('error').textContent = text
+        $('error').hidden = false
+      }
+      if (new URLSearchParams(location.search).has('error')) show('The PIN was not accepted: use 4 to 8 digits.')
+      $('form').addEventListener('submit', (event) => {
+        event.preventDefault()
+        const pin = $('pin').value
+        if (!/^\d{4,8}$/.test(pin)) return show('Use 4 to 8 digits.')
+        if (pin !== $('again').value) return show('The two PINs are different.')
+        window.ilovestock.setPin(pin)
+        document.body.textContent = 'Starting iLoveStock…'
+      })
+    </script>
+  </body>
+</html>

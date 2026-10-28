@@ -75,7 +75,8 @@ export default function PinScreen({ mode, onUnlocked }: { mode: 'setup' | 'unloc
         Unlock
       </Button>
       <p className="mt-6 text-sm text-muted">
-        Forgot the PIN? Run <code className="text-text">ilovestock pin reset</code> in a terminal.
+        Forgot the PIN? In the desktop app, use the menu iLoveStock &gt; Reset PIN. Otherwise run{' '}
+        <code className="text-text">ilovestock pin reset</code> in a terminal.
       </p>
     </Card>
   )

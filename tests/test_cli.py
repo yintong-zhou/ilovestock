@@ -168,7 +168,22 @@ def test_serve_asks_pin_in_terminal(monkeypatch, tmp_path):
     assert real(path).verify("4821")
 
 
-def test_serve_without_terminal_refuses_to_prompt(monkeypatch, tmp_path):
+def test_serve_reads_pin_from_desktop_window(monkeypatch, tmp_path):
+    import uvicorn
+
+    from ilovestock.api import pin as pinmod
+
+    path, real = tmp_path / "pin.json", pinmod.PinStore
+    monkeypatch.setattr(pinmod, "PinStore", lambda: real(path))
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    # stdin is a pipe, as in the desktop window: one PIN per line, no confirmation
+    result = runner.invoke(cli.app, ["serve"], input="12\n4821\n")
+    assert result.exit_code == 0, result.output
+    assert result.output.count(cli.ASK_PIN) == 2 and "4 to 8 digits" in result.output
+    assert real(path).verify("4821")
+
+
+def test_serve_without_pin_answer_fails(monkeypatch, tmp_path):
     import uvicorn
 
     from ilovestock.api import pin as pinmod
@@ -176,7 +191,7 @@ def test_serve_without_terminal_refuses_to_prompt(monkeypatch, tmp_path):
     path, real = tmp_path / "pin.json", pinmod.PinStore
     monkeypatch.setattr(pinmod, "PinStore", lambda: real(path))
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: pytest.fail("server started"))
-    result = runner.invoke(cli.app, ["serve"])  # stdin is a pipe, as in the desktop window
+    result = runner.invoke(cli.app, ["serve"])  # stdin closed: nobody to ask
     assert result.exit_code == 1 and "terminal" in result.output
     assert not path.exists()
 

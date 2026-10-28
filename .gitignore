@@ -19,6 +19,8 @@ __pycache__/
 # Frontend
 web/node_modules/
 desktop/node_modules/
+desktop/python/
+desktop/dist/
 src/ilovestock/static/
 
 # Python build output
