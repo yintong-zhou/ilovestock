@@ -50,6 +50,7 @@ def test_split_like_the_web():
 def test_render_summary_sections_and_disclaimer():
     data = pdf.render([ROW], "Watchlist", datetime(2026, 10, 23, 15, 0))
     assert data.startswith(b"%PDF")
+    assert data.count(b"/Subtype /Image") == 1  # the logo, embedded once for every page
     t = text(data)
     for s in ("Watchlist", "2026-10-23 15:00", "not financial advice", "HZO", "NO-BUY", "1/2",
               "0/1", "Donchian 10w", "> 31.00", "N/D", "Donchian 10w: FAIL", "37.00"):  # fmt: skip

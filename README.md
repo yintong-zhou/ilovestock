@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="web/public/logo.png" alt="iLoveStock logo" width="120">
+
 # iLoveStock
 
 **Rule-based BUY / NO-BUY screening and trade plans for US stocks**
@@ -217,6 +219,17 @@ ilovestock serve                                   # http://127.0.0.1:3000 (or 3
 > [!IMPORTANT]
 > The server listens on `127.0.0.1` only. The PIN is a lock for this computer, not real authentication: do not expose the app on a network.
 
+### Desktop window
+
+The same app in its own window instead of a browser tab. It starts `ilovestock serve` and stops it when you close the window. It needs Node.js, ilovestock installed and the frontend built (above).
+
+```bash
+cd desktop && npm install && npm start   # the first start downloads Electron
+```
+
+- **First start.** Set the PIN once with `ilovestock serve` in a terminal: the window has no terminal to ask in, so without a PIN it shows an error.
+- **Virtual environment.** If `ilovestock` is not on the PATH (venv not active), point to it: `ILOVESTOCK_BIN=../.venv/Scripts/ilovestock.exe npm start` (macOS/Linux: `../.venv/bin/ilovestock`).
+
 ## How the verdict works
 
 **BUY** requires all of the following. Anything else is **NO-BUY**, with the reasons listed. The only exception is `--allow-missing`: if every criterion with data passes and some fundamentals are `N/D`, the verdict is **BUY\*** (incomplete data), never a plain BUY.
@@ -321,6 +334,7 @@ src/ilovestock/
   api/            FastAPI app and PIN gate for the web app
 tests/            offline tests and recorded fixtures
 web/              React frontend
+desktop/          Electron window around `ilovestock serve`
 ```
 
 ### Roadmap

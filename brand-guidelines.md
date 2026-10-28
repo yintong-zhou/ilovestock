@@ -45,6 +45,11 @@ Real people in professional settings, data and charts presented clearly, consist
 
 The logo always appears in the same position (top left) across digital materials. Clear space equal to the cap-height of the mark.
 
+Files (256 px, cropped to the mark):
+
+- `web/public/logo.png`: transparent background. Web app (sidebar, PIN screen, favicon), desktop window icon, README.
+- `src/ilovestock/logo.png`: white background. PDF documents (History and Watchlist), top left of every page.
+
 ## Do's and Don'ts
 
 **Do:**

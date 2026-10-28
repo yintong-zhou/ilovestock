@@ -28,6 +28,7 @@ ruff format --check .                           # also formats Python code block
 cd web && npm ci && npm run lint && npm run build   # tsc + vite build into src/ilovestock/static/
 ilovestock serve                                 # API + built UI on 127.0.0.1:3000 (first free port)
 cd web && npm run dev                            # :5173, /api proxied to :3000
+cd desktop && npm install && npm start           # Electron window around `ilovestock serve`
 
 python execution/record_fixtures.py [TICKER] [FINVIZ_URL]   # re-record fixtures (network)
 python execution/record_fixtures.py --screen                # default screener page fixture
@@ -110,7 +111,7 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
   `lastRun`, `lastScreen`, `screening`, `screenError`, and a `locks` counter that drops results
   landing after Lock.
 - **Frontend scope:** the frontend displays and collects input. It never re-implements rules.
-- **Brand:** fonts and colors come from `brand-guidelines.md`.
+- **Brand:** fonts, colors and logo files come from `brand-guidelines.md`.
 
 ## Hard rules
 
