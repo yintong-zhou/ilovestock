@@ -6,11 +6,13 @@ Latin-1 only: other characters get an ASCII stand-in or "?".
 """
 
 from datetime import datetime
+from pathlib import Path
 
 from fpdf import FPDF, FontFace
 
 from ilovestock.export import NOTICE, SOURCES
 
+LOGO = Path(__file__).with_name("logo.png")  # white-background version, for white pages
 PRIMARY = (11, 61, 98)  # brand-guidelines.md
 MUTED = (110, 120, 130)
 STATUS = {"PASS": (46, 158, 91), "FAIL": (192, 57, 43)}  # N/D: muted
@@ -45,6 +47,11 @@ def _passed(items: list[dict]) -> str:
 
 
 class _PDF(FPDF):
+    def header(self):
+        # brand-guidelines.md: the logo always sits top left.
+        self.image(LOGO, x=self.l_margin, y=8, h=12)
+        self.set_y(23)
+
     def footer(self):
         self.set_y(-12)
         self.set_font("helvetica", size=7)

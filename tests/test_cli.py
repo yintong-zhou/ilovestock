@@ -152,6 +152,7 @@ def test_analyze_rejects_unknown_export_format(offline):
 
 
 def test_serve_asks_pin_in_terminal(monkeypatch, tmp_path):
+    import typer.testing
     import uvicorn
 
     from ilovestock.api import pin as pinmod
@@ -159,10 +160,25 @@ def test_serve_asks_pin_in_terminal(monkeypatch, tmp_path):
     path, real = tmp_path / "pin.json", pinmod.PinStore
     monkeypatch.setattr(pinmod, "PinStore", lambda: real(path))
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    # The runner's stdin is a pipe: make it act as the terminal.
+    monkeypatch.setattr(typer.testing._NamedTextIOWrapper, "isatty", lambda self: True)
     result = runner.invoke(cli.app, ["serve"], input="12\n12\n4821\n4821\n")
     assert result.exit_code == 0, result.output
     assert "4 to 8 digits" in result.output  # "12" refused, asked again
     assert real(path).verify("4821")
+
+
+def test_serve_without_terminal_refuses_to_prompt(monkeypatch, tmp_path):
+    import uvicorn
+
+    from ilovestock.api import pin as pinmod
+
+    path, real = tmp_path / "pin.json", pinmod.PinStore
+    monkeypatch.setattr(pinmod, "PinStore", lambda: real(path))
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: pytest.fail("server started"))
+    result = runner.invoke(cli.app, ["serve"])  # stdin is a pipe, as in the desktop window
+    assert result.exit_code == 1 and "terminal" in result.output
+    assert not path.exists()
 
 
 def test_free_port_skips_busy():

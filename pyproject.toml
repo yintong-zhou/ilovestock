@@ -33,7 +33,7 @@ dev = ["pytest>=8", "ruff>=0.6", "ta-lib>=0.6", "httpx>=0.27"]
 ilovestock = "ilovestock.cli:app"
 
 [tool.setuptools.package-data]
-ilovestock = ["static/**/*"]
+ilovestock = ["static/**/*", "logo.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

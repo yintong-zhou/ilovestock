@@ -224,7 +224,7 @@ No deadlines (spare-time development). Ordered by dependency.
 **Before publishing:**
 - D9 License. **Decided: GPL-3.0.** Project name is decided: `ilovestock`. `finviz` is MIT, no constraint.
 - D10 Finviz ToS: library authors warn use may violate them. **Decided (2026-10-20): Finviz is the main source for fundamentals and a required dependency; yfinance is the per-field fallback and the price source. Warning in README and CLI output.**
-- D11 Web/graphical UI: not excluded, but chosen output is terminal + reports. Default: no GUI in v1. **Decided (2026-10-20): local web app (`ilovestock serve`, 127.0.0.1 only, PIN set in the terminal) on the same core as the CLI.**
+- D11 Web/graphical UI: not excluded, but chosen output is terminal + reports. Default: no GUI in v1. **Decided (2026-10-20): local web app (`ilovestock serve`, 127.0.0.1 only, PIN set in the terminal) on the same core as the CLI.** **Added (2026-10-28, issue #5): Electron window around `serve` in `desktop/`, run from the repo (no installer); the PIN is still set in the terminal.**
 
 ## Risks
 - yfinance is unofficial: blocking or format changes. Mitigation: disk cache, swappable provider, second price provider later.

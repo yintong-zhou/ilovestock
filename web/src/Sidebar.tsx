@@ -23,7 +23,12 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
 ]
 
 export function Wordmark() {
-  return <span className="font-heading text-xl font-bold tracking-tight">iLoveStock</span>
+  return (
+    <span className="inline-flex items-center gap-2 font-heading text-xl font-bold tracking-tight">
+      <img src="/logo.png" alt="" width={32} height={32} />
+      iLoveStock
+    </span>
+  )
 }
 
 /** Left column on desktop, top bar below 768px. */

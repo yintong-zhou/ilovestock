@@ -1,6 +1,7 @@
 """CLI: thin layer over the core. No business rules here."""
 
 import socket
+import sys
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -243,6 +244,9 @@ def serve(
 
     # The PIN is set here, never over HTTP: no other local process can claim the app first.
     store = PinStore()
+    if not store.configured() and not sys.stdin.isatty():
+        # Started without a terminal (desktop window): a hidden prompt would wait forever.
+        _fail("No PIN set. Run `ilovestock serve` in a terminal once to set it.")
     while not store.configured():
         pin = typer.prompt(
             "Set the web app PIN (4 to 8 digits)", hide_input=True, confirmation_prompt=True
