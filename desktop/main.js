@@ -1,53 +1,126 @@
 // Desktop window for the local web app: runs `ilovestock serve`, shows it, stops it on close.
 import { spawn } from 'node:child_process'
 import path from 'node:path'
-import { app, BrowserWindow, dialog } from 'electron'
+import readline from 'node:readline'
+import { pathToFileURL } from 'node:url'
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 
-const bin = process.env.ILOVESTOCK_BIN || 'ilovestock' // e.g. ..\.venv\Scripts\ilovestock.exe
-let server
+const ASK_PIN = 'ilovestock: set PIN' // printed by `serve` (cli.py) when no PIN is set
+// Installed: the bundled Python (resources/python). From the repo: `ilovestock` on the PATH.
+const [bin, cli] = app.isPackaged
+  ? [path.join(process.resourcesPath, 'python', 'python.exe'), ['-m', 'ilovestock']]
+  : [process.env.ILOVESTOCK_BIN || 'ilovestock', []] // e.g. ..\.venv\Scripts\ilovestock.exe
+const options = {
+  windowsHide: true,
+  env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+}
+const pinPage = path.join(import.meta.dirname, 'pin.html')
+const starting = `data:text/html;charset=utf-8,${encodeURIComponent(
+  '<body style="margin:0;height:100vh;display:grid;place-items:center;background:#0b3d62;' +
+    'color:#eef3f6;font:18px Segoe UI,sans-serif">Starting iLoveStock…</body>',
+)}`
 let win
-let output = ''
+let server
+let origin // of the running server: the only site the window may navigate to
 let quitting = false
 
 function fail(message) {
   if (quitting) return
   quitting = true
-  dialog.showErrorBox('ilovestock', message)
+  dialog.showErrorBox('iLoveStock', message)
   app.quit()
 }
 
-function open(url) {
-  const icon = path.join(import.meta.dirname, '..', 'web', 'public', 'logo.png')
-  const w = new BrowserWindow({ width: 1280, height: 860, icon })
-  const origin = new URL(url).origin
-  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  w.webContents.on('will-navigate', (event, target) => {
+function start() {
+  const proc = spawn(bin, [...cli, 'serve'], options)
+  let output = ''
+  let asked = false
+  server = proc
+  readline.createInterface({ input: proc.stdout }).on('line', (line) => {
+    output += `${line}\n`
+    const url = line.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0]
+    if (line === ASK_PIN) {
+      win.loadFile(pinPage, { query: asked ? { error: '1' } : {} }) // asked again: PIN refused
+      asked = true
+    } else if (url) {
+      origin = new URL(url).origin
+      win.loadURL(url)
+    }
+  })
+  proc.stderr.on('data', (chunk) => (output += chunk))
+  proc.on('error', (e) => fail(`Cannot start ${bin}: ${e.message}`))
+  proc.on('close', () => {
+    if (proc === server) fail(`The iLoveStock server stopped.\n\n${output.trim()}`)
+  })
+}
+
+async function resetPin() {
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'warning',
+    buttons: ['Reset PIN', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    message: 'Reset the PIN?',
+    detail: 'You will choose a new PIN. History, watchlist and settings are kept.',
+  })
+  if (response !== 0) return
+  const old = server
+  server = null // its exit is expected now
+  old?.kill()
+  origin = undefined
+  win.loadURL(starting)
+  const reset = spawn(bin, [...cli, 'pin', 'reset', '--yes'], options)
+  const code = await new Promise((resolve) => reset.on('close', resolve))
+  if (code !== 0) dialog.showErrorBox('iLoveStock', 'The PIN could not be reset.')
+  start()
+}
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 1280,
+    height: 860,
+    icon: path.join(import.meta.dirname, 'logo.png'),
+    webPreferences: { preload: path.join(import.meta.dirname, 'preload.cjs') },
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event, target) => {
     if (new URL(target).origin !== origin) event.preventDefault()
   })
   // `serve` prints the URL just before uvicorn listens: retry while the connection is refused.
-  w.webContents.on('did-fail-load', (_event, code) => {
-    if (code === -102) setTimeout(() => w.loadURL(url), 300)
+  win.webContents.on('did-fail-load', (_event, code, _text, url) => {
+    if (code === -102 && new URL(url).origin === origin) setTimeout(() => win.loadURL(url), 300)
   })
-  w.loadURL(url)
-  return w
+  win.loadURL(starting)
 }
 
-app.whenReady().then(() => {
-  server = spawn(bin, ['serve'], {
-    windowsHide: true,
-    env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
-  })
-  const read = (chunk) => {
-    output += chunk
-    const match = !win && output.match(/http:\/\/127\.0\.0\.1:\d+/)
-    if (match) win = open(match[0])
-  }
-  server.stdout.on('data', read)
-  server.stderr.on('data', read)
-  server.on('error', (e) => fail(`Cannot start ${bin}: ${e.message}`))
-  server.on('exit', () => fail(`The ilovestock server stopped.\n\n${output.trim()}`))
+// Only pin.html may answer `serve`, and only with what it accepts (one line, 4 to 8 digits).
+ipcMain.on('pin', (event, pin) => {
+  if (event.senderFrame?.url.startsWith(pathToFileURL(pinPage).href) && /^\d{4,8}$/.test(pin))
+    server?.stdin.write(`${pin}\n`)
 })
 
+if (!app.requestSingleInstanceLock()) app.quit()
+else
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: 'iLoveStock',
+          submenu: [{ label: 'Reset PIN…', click: resetPin }, { type: 'separator' }, { role: 'quit' }],
+        },
+        { role: 'editMenu' },
+        { role: 'viewMenu' },
+      ]),
+    )
+    createWindow()
+    start()
+  })
+
+// A second double-click on the shortcut brings this window back instead of a second server.
+app.on('second-instance', () => {
+  if (win?.isMinimized()) win.restore()
+  win?.focus()
+})
 app.on('window-all-closed', () => app.quit())
 app.on('before-quit', () => {
   quitting = true

@@ -47,7 +47,8 @@ The logo always appears in the same position (top left) across digital materials
 
 Files (256 px, cropped to the mark):
 
-- `web/public/logo.png`: transparent background. Web app (sidebar, PIN screen, favicon), desktop window icon, README.
+- `web/public/logo.png`: transparent background. Web app (sidebar, PIN screen, favicon), README.
+- `desktop/logo.png`: the same file, for the desktop app (window and installer icon, first-PIN screen).
 - `src/ilovestock/logo.png`: white background. PDF documents (History and Watchlist), top left of every page.
 
 ## Do's and Don'ts

@@ -219,16 +219,22 @@ ilovestock serve                                   # http://127.0.0.1:3000 (or 3
 > [!IMPORTANT]
 > The server listens on `127.0.0.1` only. The PIN is a lock for this computer, not real authentication: do not expose the app on a network.
 
-### Desktop window
+### Desktop app (Windows)
 
-The same app in its own window instead of a browser tab. It starts `ilovestock serve` and stops it when you close the window. It needs Node.js, ilovestock installed and the frontend built (above).
+The same app in its own window, for people who don't use the terminal. It comes as one file, **Installa iLoveStock.exe**, with Python included. Double-click it: it installs for the current user (no administrator rights), puts **iLoveStock** on the desktop and in the Start menu, and opens the app. The window starts the server and stops it when you close it.
+
+- **Windows warning.** The installer is not signed, so Windows shows "Windows protected your PC" ("PC protetto da Windows"). Click **More info**, then **Run anyway**.
+- **First start.** The app asks you to choose a PIN (4 to 8 digits) in its own window, then to enter it to unlock, as at every start.
+- **Forgot the PIN?** Menu **iLoveStock > Reset PIN…**, then choose a new one. History, watchlist and settings are kept.
+- **Uninstall.** Windows Settings > Apps > iLoveStock. Your files in `~/.config/ilovestock` stay.
+
+Build the installer on Windows with Node.js and Python 3.12 (the `py` launcher). It downloads Python 3.12.10 from python.org and the dependencies from PyPI:
 
 ```bash
-cd desktop && npm install && npm start   # the first start downloads Electron
+cd desktop && npm install && npm run dist   # desktop/dist/Installa iLoveStock.exe
 ```
 
-- **First start.** Set the PIN once with `ilovestock serve` in a terminal: the window has no terminal to ask in, so without a PIN it shows an error.
-- **Virtual environment.** If `ilovestock` is not on the PATH (venv not active), point to it: `ILOVESTOCK_BIN=../.venv/Scripts/ilovestock.exe npm start` (macOS/Linux: `../.venv/bin/ilovestock`).
+From the repo, `npm start` in `desktop/` opens the same window on the installed `ilovestock` (if the venv is not active: `ILOVESTOCK_BIN=../.venv/Scripts/ilovestock.exe npm start`).
 
 ## How the verdict works
 

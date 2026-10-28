@@ -218,6 +218,9 @@ def config_path() -> None:
     console.print(str(cfgmod.CONFIG_PATH))
 
 
+ASK_PIN = "ilovestock: set PIN"  # read by desktop/main.js
+
+
 def free_port(start: int = 3000) -> int:
     """First port from `start` up that 127.0.0.1 can bind."""
     for port in range(start, 65536):
@@ -244,13 +247,17 @@ def serve(
 
     # The PIN is set here, never over HTTP: no other local process can claim the app first.
     store = PinStore()
-    if not store.configured() and not sys.stdin.isatty():
-        # Started without a terminal (desktop window): a hidden prompt would wait forever.
-        _fail("No PIN set. Run `ilovestock serve` in a terminal once to set it.")
     while not store.configured():
-        pin = typer.prompt(
-            "Set the web app PIN (4 to 8 digits)", hide_input=True, confirmation_prompt=True
-        )
+        if sys.stdin.isatty():
+            pin = typer.prompt(
+                "Set the web app PIN (4 to 8 digits)", hide_input=True, confirmation_prompt=True
+            )
+        else:
+            # No terminal: the desktop window answers this line with the PIN on stdin.
+            print(ASK_PIN, flush=True)
+            pin = sys.stdin.readline().strip()
+            if not pin:
+                _fail("No PIN set. Run `ilovestock serve` in a terminal once to set it.")
         try:
             store.set(pin)
         except PinError as e:

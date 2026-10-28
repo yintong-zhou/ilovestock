@@ -1,13 +1,40 @@
 {
   "name": "ilovestock-desktop",
+  "productName": "iLoveStock",
   "private": true,
   "version": "0.1.0",
+  "description": "iLoveStock desktop app: educational stock screening, not financial advice",
+  "author": "yintong-zhou",
   "type": "module",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "node build-python.mjs && electron-builder --win"
+  },
+  "build": {
+    "appId": "io.github.yintong-zhou.ilovestock",
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "pin.html",
+      "logo.png"
+    ],
+    "extraResources": [
+      {
+        "from": "python",
+        "to": "python"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "logo.png"
+    },
+    "nsis": {
+      "artifactName": "Installa ${productName}.exe"
+    }
   },
   "devDependencies": {
-    "electron": "^45.1.0"
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
   }
 }

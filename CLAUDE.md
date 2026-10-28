@@ -29,6 +29,7 @@ cd web && npm ci && npm run lint && npm run build   # tsc + vite build into src/
 ilovestock serve                                 # API + built UI on 127.0.0.1:3000 (first free port)
 cd web && npm run dev                            # :5173, /api proxied to :3000
 cd desktop && npm install && npm start           # Electron window around `ilovestock serve`
+cd desktop && npm run dist                       # Windows installer in desktop/dist (needs py -3.12, network)
 
 python execution/record_fixtures.py [TICKER] [FINVIZ_URL]   # re-record fixtures (network)
 python execution/record_fixtures.py --screen                # default screener page fixture
@@ -112,6 +113,10 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
   landing after Lock.
 - **Frontend scope:** the frontend displays and collects input. It never re-implements rules.
 - **Brand:** fonts, colors and logo files come from `brand-guidelines.md`.
+- **Desktop (`desktop/`):** `main.js` runs `serve` (installed app: `resources/python/python.exe -m
+  ilovestock`) and loads the URL it prints. Without a terminal and without a PIN, `serve` prints
+  `cli.ASK_PIN` and reads the PIN on stdin: `pin.html` collects it. The installer bundles the
+  embeddable Python 3.12.10 built by `build-python.mjs`.
 
 ## Hard rules
 
