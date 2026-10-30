@@ -1,7 +1,7 @@
 ---
 type: handoff
 date: 2026-10-30
-status: ready for review (PR #8 open, CI running at the last check)
+status: merged (PR #8 on main, CI green)
 seq: 6
 prev: docs/handoff/2026-10-23-web-watchlist-dashboard.md
 tags: [ilovestock, logging, progress, web, cli, desktop]
@@ -19,15 +19,20 @@ From now on, logs and documents inside ilovestock are written in English; chat s
 
 ## Where we are
 
-- **Done and committed:** commit `8bf58ed` on branch `yintong-zhou/error-log-progress`, pushed.
-- **PR:** https://github.com/yintong-zhou/ilovestock/pull/8, ready for review (not a draft).
-  At the last check CI had 1 check passing and 2 pending: the Python 3.11/3.13 test jobs.
-- **Auto-fix:** the user declined it, so nobody is watching CI.
+- **Merged:** https://github.com/yintong-zhou/ilovestock/pull/8 (commit `8bf58ed`) was merged
+  into `main` on 2026-10-30 as `74ca672`. This handoff was added to `main` afterwards as `f8f8d7e`.
+- **Branches:** the remote branch `yintong-zhou/error-log-progress` is deleted. The local one is
+  still there, with an extra commit `1712ee5` holding an earlier copy of this handoff, under a
+  "Feat:" message.
 - **Checks:**
+  - CI on PR #8 and on `main` after the merge: green on Python 3.11 and 3.13, and web lint and
+    build;
   - local, Python 3.12: 273 tests pass; ruff, eslint and `npm run build` are clean;
   - manual: Screener and Analysis bars, the Log page, the 375 px layout, the terminal Rich bar,
     and `serve` on a busy port (error on stderr and in the CSV).
-- **Not merged.**
+- **Local venv:** reinstalled with `pip install -e .`; its `ilovestock.exe` calls `cli:main`.
+- **Not done yet:** a real screen against live Finviz/Yahoo with the new log and bar. Live
+  requests need the user's OK.
 - **Deferred minors from the final review, not started:**
   - the `serve` tests in `tests/test_cli.py` leave a root `StreamHandler` bound to CliRunner's
     closed stderr, which causes hidden "Logging error" noise in the test output. Fix:
@@ -140,12 +145,15 @@ From now on, logs and documents inside ilovestock are written in English; chat s
 
 ## Where we want to go
 
-1. Check CI on PR #8, in particular the Python 3.11 and 3.13 jobs. If a job fails, read the
-   failing check and fix it on the branch.
-2. Once CI is green, have the PR reviewed and merge it (ask the user before merging).
-3. After the merge, run `pip install -e .` in the venv, and in any editable install used by the
-   desktop dev mode.
-4. Optionally, fix the three deferred minors listed above, in a small follow-up PR.
+1. Run a real `ilovestock screen` (ask the user first: it hits Finviz and Yahoo). Then open the Log
+   page or `~/.config/ilovestock/ilovestock-log.csv` to see why tickers were skipped; this was the
+   reason for the whole feature.
+2. Fix the three deferred minors listed above, in a small follow-up PR, on a new branch from
+   `main`.
+3. Delete the local branch `yintong-zhou/error-log-progress` with `git branch -D`. Plain `-d`
+   refuses because `1712ee5` is on `main` under another hash (`f8f8d7e`). Ask the user first.
+4. Run `pip install -e .` again in any other editable install used by the desktop dev mode
+   (`ILOVESTOCK_BIN`); the repo's `.venv` is already done.
 
 ## Know before touching anything
 
@@ -166,6 +174,6 @@ From now on, logs and documents inside ilovestock are written in English; chat s
   - call `errorlog.setup(tmp/"log.csv")` and `PinStore(tmp/"pin.json").set("1234")`, then run
     `uvicorn.run(app, ..., log_config=None)`.
   The scratch scripts were not kept.
-- **Python versions:** only 3.12 is installed locally (`py -0`). `uv` is available, but we did not
-  download 3.11 or 3.13 for this work; CI covers them.
+- **Python versions:** only 3.12 is installed locally (`py -0`). CI runs 3.11 and 3.13, and both
+  passed on this work.
 - **`npm run build`** writes into `src/ilovestock/static/`, which is git-ignored.
