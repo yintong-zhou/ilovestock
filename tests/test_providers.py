@@ -156,7 +156,7 @@ def test_finviz_provider_merges_with_yahoo_fallback(fake_yf, fake_finviz):
     assert f.note == ""
 
 
-def test_finviz_failure_falls_back_never_guesses(fake_yf, monkeypatch):
+def test_finviz_failure_falls_back_never_guesses(fake_yf, monkeypatch, caplog):
     def boom(_):
         raise RuntimeError("page changed")
 
@@ -166,6 +166,8 @@ def test_finviz_failure_falls_back_never_guesses(fake_yf, monkeypatch):
     assert f.inst_own_pct == pytest.approx(84.632003) and f.sources["inst_own_pct"] == "Yahoo"
     assert f.inst_trans_pct is None and f.sales_growth_yoy_pct is None
     assert "page changed" in f.note
+    (rec,) = caplog.records
+    assert (rec.getMessage(), rec.ticker) == ("Finviz quote page failed", "HZO") and rec.exc_info
 
 
 def test_cache_keeps_finviz_fields(fake_yf, fake_finviz, tmp_path):

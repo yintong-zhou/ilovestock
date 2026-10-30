@@ -6,6 +6,7 @@ Unofficial scraping: Finviz ToS may forbid it, quotes are delayed 15-20 min.
 """
 
 import dataclasses
+import logging
 import math
 import re
 from collections.abc import Iterator
@@ -21,6 +22,7 @@ from ilovestock.providers.base import HISTORY_PERIOD, MarketDataProvider
 WARNING = (
     "Finviz: unofficial source (scraping), use may violate Finviz ToS; quotes delayed 15-20 min."
 )
+logger = logging.getLogger(__name__)
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 PAGE_SIZE = 20
 OVERLAP = 5  # rows read twice per page: a stock rising up to 5 places between requests is seen
@@ -125,6 +127,7 @@ class FinvizProvider:
         except Exception as e:
             base = Fundamentals(sales=[], eps=[], roe_pct=None, market_cap=None, next_earnings=None)
             notes.append(f"Yahoo error: {e}")
+            logger.warning("Yahoo fundamentals failed", exc_info=True, extra={"ticker": ticker})
         sources = {
             k: "Yahoo"
             for k in ("roe_pct", "market_cap", "next_earnings", "inst_own_pct")
@@ -136,6 +139,7 @@ class FinvizProvider:
         except Exception as e:  # scraping: any site change surfaces here
             fv = {}
             notes.append(f"Finviz error: {e}")
+            logger.warning("Finviz quote page failed", exc_info=True, extra={"ticker": ticker})
         finally:  # the lib caches pages forever: drop it so the next call refetches
             finviz.main_func.STOCK_PAGE.pop(ticker, None)
         found = {k: v for k, v in fv.items() if v is not None}

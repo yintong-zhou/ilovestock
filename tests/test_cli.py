@@ -4,7 +4,7 @@ import pytest
 from rich.console import Console
 from typer.testing import CliRunner
 
-from ilovestock import cli, config, history, inputs
+from ilovestock import cli, config, errorlog, history, inputs
 from ilovestock.models import DISCLAIMER, Quality
 from ilovestock.screener import ScreenHit, ScreenResult
 
@@ -84,6 +84,7 @@ def offline(monkeypatch, fake_yf, fake_finviz, tmp_path):
     monkeypatch.setattr(cli.finviz, "screener_rows", lambda url: [("SCRN", 1e9), ("HZO", 1e9)])
     monkeypatch.setattr(config, "CONFIG_PATH", tmp_path / "config.toml")
     monkeypatch.setattr(history, "HISTORY_PATH", tmp_path / "history.csv")
+    monkeypatch.setattr(errorlog, "LOG_PATH", tmp_path / "log.csv")
     return tmp_path
 
 
@@ -103,6 +104,7 @@ def test_analyze_combines_three_inputs(offline):
     rows = [line.split("│")[1].strip() for line in result.output.splitlines() if "NO-BUY" in line]
     assert rows == ["HZO", "WLST", "SCRN"]  # union, deduplicated, input order
     assert "Data error" in result.output  # WLST/SCRN have no recorded data: reported, not crashed
+    assert f"Data errors: details in {offline / 'log.csv'}" in result.output
     assert DISCLAIMER in result.output.replace("\n", " ")
 
 
@@ -230,7 +232,7 @@ def test_screen_none_pass_exits_zero_without_file(offline):
     result = runner.invoke(cli.app, ["screen", "--out", str(offline / "w.txt")])
     assert result.exit_code == 0, result.output
     assert "No stock passes" in result.output and not (offline / "w.txt").exists()
-    assert "Skipped for data errors: SCRN" in result.output
+    assert f"Skipped for data errors: SCRN. Details: {offline / 'log.csv'}" in result.output
     assert "2 candidates from Finviz, 0 pass every fundamental rule" in result.output
 
 
@@ -247,6 +249,17 @@ def test_screen_saves_watchlist(offline, monkeypatch):
     assert f"ilovestock analyze --watchlist {out}" in result.output.replace("\n", "")
     assert "ROIC #2, margin #3 of 47" in result.output
     assert DISCLAIMER in result.output.replace("\n", " ")
+
+
+def test_screen_failure_is_logged(offline, monkeypatch, caplog):
+    def fail(*_, **__):
+        raise cli.finviz.FinvizError("more than 100 micro/small/mid candidates")
+
+    monkeypatch.setattr(cli.screener, "screen", fail)
+    result = runner.invoke(cli.app, ["screen"])
+    assert result.exit_code == 1 and f"Details: {offline / 'log.csv'}" in result.output
+    (rec,) = caplog.records
+    assert rec.levelname == "ERROR" and "more than 100" in rec.getMessage() and rec.exc_info
 
 
 def test_screen_max_is_bounded():

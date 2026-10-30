@@ -2,7 +2,7 @@ import { type ButtonHTMLAttributes, type ReactNode, useEffect, useState } from '
 
 import { api } from './api'
 import { fmt, qualityText } from './format'
-import type { CriterionResult, Quality, Status, TradePlan, Verdict } from './types'
+import type { CriterionResult, Progress, Quality, Running, Status, TradePlan, Verdict } from './types'
 
 export function PageHeader({ title, aside, children }: { title: string; aside?: ReactNode; children?: ReactNode }) {
   return (
@@ -102,6 +102,54 @@ export function Message({ kind, children }: { kind: 'error' | 'info'; children: 
     <p role={kind === 'error' ? 'alert' : 'status'} className={`mt-4 rounded-sm border-l-2 bg-well px-4 py-2 ${style}`}>
       {children}
     </p>
+  )
+}
+
+/** Phase text and bar of the screen or analysis running on the server. Polls while `busy`, and
+ * once on mount: a run started before the page opened (or left and reopened) shows until it ends. */
+export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }) {
+  const [step, setStep] = useState<Progress | null>(null)
+
+  useEffect(() => {
+    let stopped = false
+    let timer: number | undefined
+    const next = (running: boolean) => {
+      if (!stopped && running) timer = window.setTimeout(poll, 1000)
+    }
+    function poll() {
+      api.progress().then(
+        (r) => {
+          if (stopped) return
+          setStep(r[job])
+          next(busy || r[job] !== null)
+        },
+        () => next(busy), // a missed poll only delays the bar: the run's own request reports errors
+      )
+    }
+    poll()
+    return () => {
+      stopped = true
+      window.clearTimeout(timer)
+    }
+  }, [job, busy])
+
+  if (!step) return null
+  const pct = step.total ? Math.round((step.done / step.total) * 100) : null
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex justify-between gap-4 text-sm">
+        <span className="min-w-0 break-words">{step.text}</span>
+        {pct !== null && <span className="font-semibold text-teal-tint">{pct}%</span>}
+      </div>
+      <div role="progressbar" aria-label={step.text} aria-valuemin={0} aria-valuemax={100}
+        aria-valuenow={pct ?? undefined} className="h-2 overflow-hidden rounded-sm bg-well">
+        {pct === null ? (
+          <div className="h-full w-full animate-pulse bg-teal" /> // total not known yet
+        ) : (
+          <div className="h-full bg-teal-tint transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        )}
+      </div>
+    </div>
   )
 }
 

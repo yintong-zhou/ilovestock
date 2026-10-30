@@ -4,20 +4,23 @@ Listens on 127.0.0.1 only (see cli.serve). Every /api route except the PIN ones 
 The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 """
 
+import logging
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from ilovestock import config as cfgmod
-from ilovestock import history, inputs, pdf, screener, watchlist
-from ilovestock.analysis import analyze_many
+from ilovestock import errorlog, history, inputs, pdf, screener, watchlist
+from ilovestock.analysis import Progress, analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
 from ilovestock.export import SOURCES, data_date
 from ilovestock.models import DISCLAIMER, CriterionResult, TickerAnalysis, Verdict
@@ -30,6 +33,7 @@ COOKIE = "ilovestock_session"
 WEB_DIST = Path(__file__).resolve().parents[1] / "static"  # built by `npm run build` in web/
 MAX_TICKERS = inputs.MAX_TICKERS  # ponytail: synchronous request; background job if lists grow
 MAX_BODY = 64 * 1024  # every request body here is small: tickers, config, a note
+logger = logging.getLogger(__name__)
 
 
 Pin = Annotated[str, Field(pattern=r"^\d{4,8}$")]  # checked before any PBKDF2 work
@@ -66,6 +70,35 @@ class AnalyzeOut(BaseModel):
 class ScreenIn(BaseModel):
     max: int = Field(screener.DEFAULT_RESULTS, ge=1, le=screener.MAX_RESULTS)
     include_large: bool = False
+
+
+class ProgressOut(BaseModel):
+    text: str  # the phase and where it is, e.g. "Checking fundamentals: ABC (12 of 87)"
+    done: int
+    total: int  # 0: not known yet
+
+
+class Running(BaseModel):
+    """Latest step of the screen and of the analysis running now, polled by the page."""
+
+    screen: ProgressOut | None
+    analyze: ProgressOut | None
+
+
+class LogRow(BaseModel):
+    """One row of the error log (errorlog.FIELDS)."""
+
+    time: str
+    level: str
+    where: str
+    ticker: str
+    message: str
+    details: str
+
+
+class LogOut(BaseModel):
+    path: str
+    rows: list[LogRow]  # newest first
 
 
 class HistoryRow(BaseModel):
@@ -114,6 +147,7 @@ def create_app(
     static_dir: Path = WEB_DIST,
     history_path: Path | None = None,
     watchlist_path: Path | None = None,
+    log_path: Path | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ilovestock", description=DISCLAIMER)
     app.add_middleware(
@@ -143,6 +177,26 @@ def create_app(
     sessions, throttle = Sessions(), Throttle()
     provider = provider or CachedProvider(finviz.FinvizProvider(YahooProvider()))
     cfg_path = config_path or cfgmod.CONFIG_PATH
+    log_file = log_path or errorlog.LOG_PATH
+    # ponytail: one slot per kind; two analyses at once (two tabs) show the latest step of either
+    running: dict[str, ProgressOut | None] = {"screen": None, "analyze": None}
+    app.state.running = running
+
+    @contextmanager
+    def report(kind: str) -> Iterator[Progress]:
+        """Progress callback for one run. At the end the slot is cleared only if it still holds
+        this run's last step: a short Watchlist refresh never wipes a long analysis."""
+        last = None
+
+        def update(text: str, done: int, total: int) -> None:
+            nonlocal last
+            last = running[kind] = ProgressOut(text=text, done=done, total=total)
+
+        try:
+            yield update
+        finally:
+            if running[kind] is last:
+                running[kind] = None
 
     def login(response: Response) -> None:
         response.set_cookie(COOKIE, sessions.new(), httponly=True, samesite="strict")
@@ -212,23 +266,30 @@ def create_app(
 
     @app.post("/api/analyze", dependencies=[Depends(session)])
     def analyze(body: AnalyzeIn) -> AnalyzeOut:
-        try:
-            cfg = cfgmod.load(cfg_path)
-            tickers = [inputs.normalize(t) for t in body.tickers]
-            if body.finviz_url:
-                tickers = inputs.merge(
-                    tickers, finviz.screener_tickers(body.finviz_url, MAX_TICKERS)
-                )
-        except (cfgmod.ConfigError, ValueError, finviz.FinvizError) as e:
-            raise HTTPException(422, str(e)) from e
-        if not tickers:
-            raise HTTPException(422, "No tickers: enter at least one ticker or a Finviz URL")
-        if len(tickers) > MAX_TICKERS:
-            raise HTTPException(422, f"Too many tickers ({len(tickers)}): max {MAX_TICKERS}")
-        try:
-            results = analyze_many(tickers, provider, cfg, date.today(), body.allow_missing)
-        except Exception as e:
-            raise HTTPException(502, f"Benchmark data not available: {e}") from e
+        with report("analyze") as progress:
+            try:
+                cfg = cfgmod.load(cfg_path)
+                tickers = [inputs.normalize(t) for t in body.tickers]
+                if body.finviz_url:
+                    progress("Importing tickers from Finviz", 0, 0)
+                    tickers = inputs.merge(
+                        tickers, finviz.screener_tickers(body.finviz_url, MAX_TICKERS)
+                    )
+            except finviz.FinvizError as e:
+                logger.exception("Finviz import failed: %s", e)
+                raise HTTPException(422, str(e)) from e
+            except (cfgmod.ConfigError, ValueError) as e:  # the user's input: shown, not logged
+                raise HTTPException(422, str(e)) from e
+            if not tickers:
+                raise HTTPException(422, "No tickers: enter at least one ticker or a Finviz URL")
+            if len(tickers) > MAX_TICKERS:
+                raise HTTPException(422, f"Too many tickers ({len(tickers)}): max {MAX_TICKERS}")
+            try:
+                today = date.today()
+                results = analyze_many(tickers, provider, cfg, today, body.allow_missing, progress)
+            except Exception as e:
+                logger.exception("Benchmark data not available: %s", e)
+                raise HTTPException(502, f"Benchmark data not available: {e}") from e
         history.append(results, datetime.now(), history_path)
         return AnalyzeOut(
             disclaimer=DISCLAIMER,
@@ -241,18 +302,25 @@ def create_app(
     @app.post("/api/screen", dependencies=[Depends(session)])
     def screen(body: ScreenIn) -> ScreenOut:
         today = date.today()
-        try:  # ponytail: synchronous like /api/analyze; the config's max_candidates bound it
-            result = screener.screen(
-                provider,
-                cfgmod.load(cfg_path),
-                today,
-                body.max,
-                include_large=body.include_large,
-            )
-        except (cfgmod.ConfigError, finviz.FinvizError) as e:
-            raise HTTPException(422, str(e)) from e
-        except Exception as e:
-            raise HTTPException(502, f"Finviz screener not available: {e}") from e
+        # ponytail: synchronous like /api/analyze; the config's max_candidates bound it
+        with report("screen") as progress:
+            try:
+                result = screener.screen(
+                    provider,
+                    cfgmod.load(cfg_path),
+                    today,
+                    body.max,
+                    progress=progress,
+                    include_large=body.include_large,
+                )
+            except cfgmod.ConfigError as e:
+                raise HTTPException(422, str(e)) from e
+            except finviz.FinvizError as e:
+                logger.exception("Screen failed: %s", e)
+                raise HTTPException(422, str(e)) from e
+            except Exception as e:
+                logger.exception("Screen failed: %s", e)
+                raise HTTPException(502, f"Finviz screener not available: {e}") from e
         return ScreenOut(
             disclaimer=DISCLAIMER,
             finviz_warning=finviz.WARNING,
@@ -260,6 +328,20 @@ def create_app(
             include_large=body.include_large,
             **vars(result),
         )
+
+    @app.get("/api/progress", dependencies=[Depends(session)])
+    def progress() -> Running:
+        return Running(**running)
+
+    @app.get("/api/log", dependencies=[Depends(session)])
+    def log_rows() -> LogOut:
+        return LogOut(path=str(log_file), rows=errorlog.read(log_file))
+
+    @app.get("/api/log/csv", dependencies=[Depends(session)])
+    def log_csv() -> FileResponse:
+        if not log_file.exists():
+            raise HTTPException(404, "No problems logged")
+        return FileResponse(log_file, media_type="text/csv", filename="ilovestock-log.csv")
 
     @app.get("/api/history", dependencies=[Depends(session)])
     def history_rows() -> list[HistoryRow]:

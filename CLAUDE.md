@@ -96,8 +96,15 @@ ticker (`TickerAnalysis.error`); only a benchmark (^GSPC) failure aborts a batch
 
 - Precedence: built-in defaults < `~/.config/ilovestock/config.toml` < CLI options (`config.py`).
 - Next to the config: `history.csv` (every analysis, shared by CLI and web), `watchlist.txt` (web
-  watchlist, one ticker per line, readable by `analyze --watchlist`) and `web_pin.json`
-  (hashed PIN).
+  watchlist, one ticker per line, readable by `analyze --watchlist`), `web_pin.json`
+  (hashed PIN) and `ilovestock-log.csv` (error log).
+- **Error log** (`errorlog.py`): stdlib `logging`, root logger at WARNING with one CSV handler,
+  set up only in `cli.main` (the console entry point), so tests never write the real file. Modules
+  log with `logging.getLogger(__name__)` and `extra={"ticker": t}`. `serve` adds a stderr
+  handler and lets uvicorn's loggers reach the root (`log_config=None`).
+- **Progress:** `analyze_many` and `screen` take `progress(text, done, total)` (`total` 0 = not
+  known yet). The CLI draws it with Rich; the API keeps the latest step per kind for
+  `GET /api/progress`, which the page polls while a run is busy.
 - Reports go to `reports/`.
 - `pdf.py` renders History/Watchlist PDFs from history rows (`POST /api/history/pdf` with the
   ids shown on the page). Core Helvetica font: text outside Latin-1 is replaced, not embedded.

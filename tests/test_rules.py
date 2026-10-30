@@ -264,7 +264,7 @@ def test_non_finite_value_is_nd(value):
     assert (c.status, c.value, c.note) == (Status.ND, None, "x; non-finite value")
 
 
-def test_analysis_error_stays_with_its_ticker(fake_yf):
+def test_analysis_error_stays_with_its_ticker(fake_yf, caplog):
     class Broken(YahooProvider):
         def history(self, t):
             df = super().history(t)
@@ -273,6 +273,28 @@ def test_analysis_error_stays_with_its_ticker(fake_yf):
     cfg = load(Path("does-not-exist.toml"))
     (r,) = analyze_many(["HZO"], Broken(), cfg, date(2026, 10, 20))
     assert r.verdict == Verdict.NO_BUY and r.error and r.reasons[0].startswith("Analysis error")
+    (rec,) = caplog.records
+    assert (rec.levelname, rec.ticker) == ("ERROR", "HZO") and rec.exc_info
+
+
+def test_analyze_many_reports_progress(fake_yf):
+    calls = []
+    cfg = load(Path("does-not-exist.toml"))
+    today = date(2026, 10, 20)
+    analyze_many(["HZO"], YahooProvider(), cfg, today, progress=lambda *a: calls.append(a))
+    assert calls == [("Loading the S&P 500 benchmark", 0, 1), ("Analyzing HZO (1 of 1)", 0, 1)]
+
+
+def test_data_error_is_logged(fake_yf, caplog):
+    class Down(YahooProvider):
+        def fundamentals(self, t):
+            raise ConnectionError("Yahoo down")
+
+    cfg = load(Path("does-not-exist.toml"))
+    (r,) = analyze_many(["HZO"], Down(), cfg, date(2026, 10, 20))
+    (rec,) = caplog.records
+    assert r.error == "Yahoo down" and (rec.levelname, rec.ticker) == ("WARNING", "HZO")
+    assert rec.exc_info
 
 
 def test_quality_error_stays_with_its_ticker(fake_yf):

@@ -1,7 +1,10 @@
 """CLI: thin layer over the core. No business rules here."""
 
+import logging
 import socket
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -10,9 +13,18 @@ from typing import Annotated
 import typer
 from rich.console import Console
 from rich.markup import escape
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
 from ilovestock import config as cfgmod
-from ilovestock import export, history, inputs, screener
+from ilovestock import errorlog, export, history, inputs, screener
+from ilovestock.analysis import Progress as ProgressFn
 from ilovestock.analysis import analyze_many
 from ilovestock.models import DISCLAIMER
 from ilovestock.providers import finviz
@@ -27,6 +39,13 @@ app.add_typer(config_app, name="config")
 pin_app = typer.Typer(help="Web app PIN.")
 app.add_typer(pin_app, name="pin")
 console = Console()
+logger = logging.getLogger(__name__)
+
+
+def main() -> None:
+    """Console entry point. The log is set up here, not in `app`: tests never write the real one."""
+    errorlog.setup()
+    app()
 
 
 class GrowthBasis(StrEnum):
@@ -40,9 +59,25 @@ class EntryMode(StrEnum):
     restart = "restart"
 
 
-def _fail(msg: str) -> None:
+def _fail(msg: str, logged: bool = False) -> None:
+    """With `logged` (inside an `except`), the message and the exception go to the error log."""
+    if logged:
+        logger.error(msg, exc_info=True)
     console.print(f"[red]Error:[/] {msg}")
+    if logged:
+        console.print(f"Details: {escape(str(errorlog.LOG_PATH))}")
     raise typer.Exit(1)
+
+
+@contextmanager
+def _progress(first: str) -> Iterator[ProgressFn]:
+    """Bar, percentage and phase text of a long run; gone when it ends. Total 0: pulsing bar."""
+    columns = SpinnerColumn(), TextColumn("{task.description}"), BarColumn(), TaskProgressColumn()
+    with Progress(*columns, TimeElapsedColumn(), console=console, transient=True) as bar:
+        task = bar.add_task(first, total=None)
+        yield lambda text, done, total: bar.update(
+            task, description=escape(text), completed=done, total=total or None
+        )
 
 
 @app.command()
@@ -93,9 +128,10 @@ def analyze(
     screened: list[str] = []
     if finviz_url:
         try:
-            screened = finviz.screener_tickers(finviz_url, max_tickers)
+            with _progress("Importing tickers from Finviz"):
+                screened = finviz.screener_tickers(finviz_url, max_tickers)
         except Exception as e:
-            _fail(f"Finviz import failed: {e}")
+            _fail(f"Finviz import failed: {e}", logged=True)
     all_tickers = inputs.merge(cli_tickers, wl, screened)
     if not all_tickers:
         _fail("no tickers: pass TICKER, --watchlist or --finviz-url")
@@ -104,19 +140,15 @@ def analyze(
 
     provider = CachedProvider(finviz.FinvizProvider(YahooProvider()))
     console.print(f"[dim]{finviz.WARNING}[/]")
-    with console.status("Analyzing...") as status:
+    with _progress("Analyzing") as progress:
         try:
-            results = analyze_many(
-                all_tickers,
-                provider,
-                cfg,
-                date.today(),
-                allow_missing,
-                lambda t: status.update(f"Analyzing {t}..."),
-            )
+            today = date.today()
+            results = analyze_many(all_tickers, provider, cfg, today, allow_missing, progress)
         except Exception as e:
-            _fail(f"benchmark {BENCHMARK} not available: {e}")
+            _fail(f"benchmark {BENCHMARK} not available: {e}", logged=True)
     print_report(results, detail, console)
+    if any(r.error for r in results):
+        console.print(f"[dim]Data errors: details in {escape(str(errorlog.LOG_PATH))}[/]")
     if saved := history.append(results, datetime.now()):
         noun = "analysis" if saved == 1 else "analyses"
         console.print(f"[dim]History: {saved} {noun} added to {history.HISTORY_PATH}[/]")
@@ -153,27 +185,23 @@ def screen(
     provider = CachedProvider(finviz.FinvizProvider(YahooProvider()))
     console.print(f"[dim]{finviz.WARNING}[/]")
     console.print("[dim]Only stocks with complete Finviz data are searched.[/]")
-    with console.status("Searching Finviz...") as status:
+    with _progress("Searching Finviz") as progress:
         try:
-            result = screener.screen(
-                provider,
-                cfg,
-                today,
-                max_results,
-                lambda t: status.update(f"Checking {t}..."),
-                include_large,
-            )
+            result = screener.screen(provider, cfg, today, max_results, progress, include_large)
         except finviz.FinvizError as e:
-            _fail(str(e))
+            _fail(str(e), logged=True)
         except Exception as e:
-            _fail(f"Finviz screener failed: {e}")
+            _fail(f"Finviz screener failed: {e}", logged=True)
     console.print(
         f"{result.candidates} candidates from Finviz, {result.passed} pass every fundamental"
         f" rule{' except Market cap' if include_large else ''},"
         f" showing {len(result.hits)} by quality score"
     )
     if result.errors:
-        console.print(f"[dim]Skipped for data errors: {', '.join(result.errors)}[/]")
+        console.print(
+            f"[dim]Skipped for data errors: {', '.join(result.errors)}."
+            f" Details: {escape(str(errorlog.LOG_PATH))}[/]"
+        )
     if not result.hits:
         console.print("No stock passes every fundamental rule.")
     else:
@@ -263,10 +291,16 @@ def serve(
         except PinError as e:
             console.print(f"[red]{e}[/]")
 
+    # Errors also go to stderr: this terminal shows them, and the desktop app shows them when the
+    # server stops. uvicorn's own loggers reach the root logger (log_config=None): the CSV too.
+    stderr = logging.StreamHandler()
+    stderr.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(stderr)
+
     # 127.0.0.1 only: the app has a PIN, not real authentication.
     port = port or free_port()
     console.print(f"ilovestock web app: http://127.0.0.1:{port}  (Ctrl+C to stop)")
-    uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(create_app(), host="127.0.0.1", port=port, log_level="warning", log_config=None)
 
 
 @pin_app.command("reset")

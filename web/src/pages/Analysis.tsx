@@ -6,6 +6,7 @@ import {
   CriteriaTable,
   Field,
   inputClass,
+  JobProgress,
   Message,
   PageHeader,
   Panel,
@@ -125,7 +126,7 @@ export default function Analysis({
             Missing fundamental data (N/D) does not block: verdict BUY* (incomplete data)
           </label>
         </form>
-        {busy && <Message kind="info">Downloading data takes a few seconds per ticker.</Message>}
+        <JobProgress job="analyze" busy={busy} />
         {error && <Message kind="error">{error}</Message>}
       </Panel>
 

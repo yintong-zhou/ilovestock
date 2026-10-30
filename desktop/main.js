@@ -36,8 +36,10 @@ function start() {
   let output = ''
   let asked = false
   server = proc
+  // The tail only: `serve` writes every warning to stderr, the reason it stopped comes last.
+  const keep = (text) => (output = (output + text).slice(-4000))
   readline.createInterface({ input: proc.stdout }).on('line', (line) => {
-    output += `${line}\n`
+    keep(`${line}\n`)
     const url = line.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0]
     if (line === ASK_PIN) {
       win.loadFile(pinPage, { query: asked ? { error: '1' } : {} }) // asked again: PIN refused
@@ -47,7 +49,7 @@ function start() {
       win.loadURL(url)
     }
   })
-  proc.stderr.on('data', (chunk) => (output += chunk))
+  proc.stderr.on('data', keep)
   proc.on('error', (e) => fail(`Cannot start ${bin}: ${e.message}`))
   proc.on('close', () => {
     if (proc === server) fail(`The iLoveStock server stopped.\n\n${output.trim()}`)

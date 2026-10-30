@@ -1,5 +1,6 @@
 """One ticker end to end: data -> criteria -> trade plan -> verdict. Shared by CLI and API."""
 
+import logging
 from collections.abc import Callable
 from datetime import date
 
@@ -14,6 +15,10 @@ from ilovestock.rules.fundamental import fundamental
 from ilovestock.rules.technical import technical
 from ilovestock.rules.trade_plan import trade_plan
 from ilovestock.rules.verdict import verdict
+
+logger = logging.getLogger(__name__)
+# progress(text, done, total): what is running and how far; total 0 = not known yet
+Progress = Callable[[str, int, int], None]
 
 
 def fundamental_checks(
@@ -36,6 +41,7 @@ def analyze(
         daily = provider.history(ticker)
         fund = provider.fundamentals(ticker)
     except Exception as e:  # unofficial sources: report per ticker, keep going
+        logger.warning("Data error", exc_info=True, extra={"ticker": ticker})
         return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Data error: {e}"], error=str(e))
 
     try:
@@ -48,6 +54,7 @@ def analyze(
         v, reasons = verdict(fund_results, tech_results, earn, plan, allow_missing)
         q = quality(fund)
     except Exception as e:  # malformed data: this ticker fails, not the benchmark or the run
+        logger.error("Analysis error", exc_info=True, extra={"ticker": ticker})
         msg = f"{type(e).__name__}: {e}"
         return TickerAnalysis(ticker, Verdict.NO_BUY, [f"Analysis error: {msg}"], error=msg)
     return TickerAnalysis(
@@ -71,16 +78,19 @@ def analyze_many(
     cfg: Config,
     today: date,
     allow_missing: bool = False,
-    progress: Callable[[str], None] | None = None,
+    progress: Progress | None = None,
 ) -> list[TickerAnalysis]:
     """Fetch the benchmark once, then analyze each ticker.
 
     Only a benchmark failure raises: each ticker's errors are reported in its result.
     """
+    n = len(tickers)
+    if progress:
+        progress("Loading the S&P 500 benchmark", 0, n)
     bench = provider.history(BENCHMARK)["Close"]
     results = []
-    for t in tickers:
+    for i, t in enumerate(tickers):
         if progress:
-            progress(t)
+            progress(f"Analyzing {t} ({i + 1} of {n})", i, n)
         results.append(analyze(t, provider, bench, cfg, today, allow_missing))
     return results
