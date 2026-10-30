@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 
-import { Button, Field, inputClass, Message, PageHeader, Panel } from '../components'
+import { Button, Field, inputClass, JobProgress, Message, PageHeader, Panel } from '../components'
 import { download, pct, points, rowClick } from '../format'
 import type { ScreenHit, ScreenOut } from '../types'
 
@@ -92,6 +92,7 @@ export default function Screener({
           </label>
         </form>
         {busy && <Message kind="info">Checking each candidate takes a few seconds. The maximum number of candidates is in Settings.</Message>}
+        <JobProgress job="screen" busy={busy} />
         {error && <Message kind="error">{error}</Message>}
       </Panel>
 
@@ -159,7 +160,10 @@ export default function Screener({
       {/* outside the panel: the table's negative margin would slide under it */}
       {result && result.errors.length > 0 && (
         <div className="mb-6 -mt-4">
-          <Message kind="info">Skipped for data errors: {result.errors.join(', ')}</Message>
+          <Message kind="info">
+            Skipped for data errors: {result.errors.join(', ')}.{' '}
+            <a href="#log" className="underline hover:text-text">Details in Log</a>
+          </Message>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { Message } from './components'
 import Analysis from './pages/Analysis'
 import Dashboard from './pages/Dashboard'
 import History from './pages/History'
+import Log from './pages/Log'
 import Portfolio from './pages/Portfolio'
 import Screener from './pages/Screener'
 import Settings from './pages/Settings'
@@ -13,7 +14,7 @@ import PinScreen from './PinScreen'
 import Sidebar, { type Page } from './Sidebar'
 import type { AnalyzeOut, PinStatus, ScreenOut } from './types'
 
-const PAGES: Page[] = ['dashboard', 'portfolio', 'screener', 'analysis', 'history', 'watchlist', 'settings']
+const PAGES: Page[] = ['dashboard', 'portfolio', 'screener', 'analysis', 'history', 'watchlist', 'log', 'settings']
 
 /** '#history/HZO' -> ['history', 'HZO']: page plus an optional argument. */
 function routeFromHash(): [Page, string] {
@@ -114,6 +115,7 @@ export default function App() {
         )}
         {page === 'history' && <History ticker={arg} onApiError={onApiError} />}
         {page === 'watchlist' && <Watchlist onApiError={onApiError} />}
+        {page === 'log' && <Log onApiError={onApiError} />}
         {page === 'settings' && <Settings onApiError={onApiError} />}
         </div>
       </main>

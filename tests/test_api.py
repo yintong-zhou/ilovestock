@@ -1,5 +1,6 @@
 """Web API: PIN gate, config, analysis on recorded data (offline)."""
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -8,26 +9,32 @@ from fastapi.testclient import TestClient
 from ilovestock import config as cfgmod
 from ilovestock import inputs, screener, watchlist
 from ilovestock.api import pin as pinmod
-from ilovestock.api.app import create_app
+from ilovestock.api.app import ProgressOut, create_app
+from ilovestock.errorlog import CsvLog
 from ilovestock.models import Quality
 from ilovestock.providers import finviz
 from ilovestock.providers.finviz import FinvizProvider
 from ilovestock.providers.yahoo import YahooProvider
 
 
-@pytest.fixture
-def client(tmp_path, fake_yf, fake_finviz):
+def make_client(tmp_path, provider=None):
     app = create_app(
         pin_path=tmp_path / "pin.json",
         config_path=tmp_path / "config.toml",
-        provider=FinvizProvider(YahooProvider()),
+        provider=provider or FinvizProvider(YahooProvider()),
         static_dir=tmp_path / "no-dist",
         history_path=tmp_path / "history.csv",
         watchlist_path=tmp_path / "watchlist.txt",
+        log_path=tmp_path / "log.csv",
     )
     c = TestClient(app, base_url="http://127.0.0.1")
     c.pin_path = tmp_path / "pin.json"
     return c
+
+
+@pytest.fixture
+def client(tmp_path, fake_yf, fake_finviz):
+    return make_client(tmp_path)
 
 
 def unlocked(client):
@@ -308,3 +315,73 @@ def test_screen_too_many_is_422(client, monkeypatch):
     monkeypatch.setattr(finviz, "screener_rows", lambda url: iter(rows))
     r = client.post("/api/screen", json={})
     assert r.status_code == 422 and "more than 100" in r.json()["detail"]
+
+
+# --- progress and log ---
+IDLE = {"screen": None, "analyze": None}
+
+
+def test_progress_and_log_need_session(client):
+    for path in ("/api/progress", "/api/log", "/api/log/csv"):
+        assert client.get(path).status_code == 401
+
+
+def test_progress_idle_and_after_failure(client, monkeypatch, caplog):
+    unlocked(client)
+    assert client.get("/api/progress").json() == IDLE
+
+    def fail(cfg, include_large=False, progress=None):
+        progress("Reading the Finviz screener: 1 rows, 1 candidates", 0, 0)
+        raise finviz.FinvizError("page changed")
+
+    monkeypatch.setattr(screener, "candidates", fail)
+    assert client.post("/api/screen", json={}).status_code == 422
+    assert client.get("/api/progress").json() == IDLE  # no stale bar after a failed run
+    assert [r.levelname for r in caplog.records] == ["ERROR"]
+
+
+def test_progress_during_screen(tmp_path, monkeypatch):
+    seen = []
+
+    class Spy:
+        def fundamentals(self, t):
+            seen.append(c.app.state.running["screen"].text)
+            raise ConnectionError("offline")
+
+    c = unlocked(make_client(tmp_path, Spy()))
+    monkeypatch.setattr(screener, "candidates", lambda *a, **k: ["A"])
+    assert c.post("/api/screen", json={}).json()["errors"] == ["A"]
+    assert seen == ["Checking fundamentals: A (1 of 1)"]
+
+
+def test_short_run_keeps_long_runs_progress(tmp_path, fake_yf, fake_finviz):
+    # a Watchlist refresh ends while a long analysis runs: the long run's step stays on show
+    step = ProgressOut(text="Analyzing A (3 of 40)", done=2, total=40)
+
+    class Racing(FinvizProvider):
+        def fundamentals(self, t):
+            c.app.state.running["analyze"] = step  # the long run reports its next ticker
+            return super().fundamentals(t)
+
+    c = unlocked(make_client(tmp_path, Racing(YahooProvider())))
+    assert c.post("/api/analyze", json={"tickers": ["HZO"]}).status_code == 200
+    assert c.get("/api/progress").json()["analyze"] == step.model_dump()
+
+
+def test_log_routes(client, tmp_path):
+    unlocked(client)
+    assert client.get("/api/log").json() == {"path": str(tmp_path / "log.csv"), "rows": []}
+    assert client.get("/api/log/csv").status_code == 404
+    record = {"name": "ilovestock.screener", "levelname": "WARNING", "levelno": logging.WARNING}
+    record |= {"msg": "Skipped", "ticker": "AB"}
+    CsvLog(tmp_path / "log.csv").handle(logging.makeLogRecord(record))
+    (row,) = client.get("/api/log").json()["rows"]
+    assert (row["level"], row["where"], row["ticker"], row["message"]) == (
+        "WARNING",
+        "ilovestock.screener",
+        "AB",
+        "Skipped",
+    )
+    r = client.get("/api/log/csv")
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.content.startswith(b"\xef\xbb\xbf")  # Excel reads the accents

@@ -129,13 +129,22 @@ def test_candidates_bound_the_rows_read(monkeypatch):
     assert next(giants)[0] == "G1001"  # stopped right after the limit
 
 
-def test_screen_reads_fundamentals_first_and_one_year_of_prices(monkeypatch):
+def test_screen_reads_fundamentals_first_and_one_year_of_prices(monkeypatch, caplog):
     # a failed fundamentals fetch costs no price download; the screen's rules need 1 year at most
     p = FakeProvider({"A": good_fundamentals(), "B": good_fundamentals(note="Finviz error: 429")})
     monkeypatch.setattr(finviz, "screener_rows", lambda url: [("A", 1e9), ("B", 1e9)])
     r = screen(p, CFG, TODAY)
     assert (r.errors, [h.ticker for h in r.hits]) == (["B"], ["A"])
     assert p.history_calls == [("A", "1y")]
+    (rec,) = caplog.records  # the reason is logged, not only the ticker
+    assert (rec.levelname, rec.ticker) == ("WARNING", "B")
+    assert "Finviz error: 429" in rec.getMessage()
+
+
+def test_screen_logs_why_a_ticker_was_skipped(monkeypatch, caplog):
+    r = run(monkeypatch, {"C": ValueError("boom")})
+    (rec,) = caplog.records
+    assert r.errors == ["C"] and rec.ticker == "C" and rec.exc_info[1].args == ("boom",)
 
 
 def test_screen_keeps_only_all_pass_and_counts(monkeypatch):
@@ -201,3 +210,16 @@ def test_screen_malformed_quality_data_skips_only_that_ticker(monkeypatch):
     bad = good_fundamentals(operating_income=["?"] * 5)
     r = run(monkeypatch, {"A": bad, "B": good_fundamentals()})
     assert (r.errors, [h.ticker for h in r.hits]) == (["A"], ["B"])
+
+
+def test_screen_reports_progress(monkeypatch):
+    calls = []
+    data = {"A": good_fundamentals(), "B": good_fundamentals()}
+    run(monkeypatch, data, progress=lambda *a: calls.append(a))
+    assert calls == [
+        ("Reading the Finviz screener: 1 rows, 1 candidates", 0, 0),  # total not known yet
+        ("Reading the Finviz screener: 2 rows, 2 candidates", 0, 0),
+        ("Checking fundamentals: A (1 of 2)", 0, 2),
+        ("Checking fundamentals: B (2 of 2)", 1, 2),
+        ("Ranking by quality", 2, 2),
+    ]

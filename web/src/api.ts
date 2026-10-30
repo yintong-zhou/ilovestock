@@ -1,4 +1,4 @@
-import type { AnalyzeOut, AppConfig, HistoryEdit, HistoryRow, PinStatus, ScreenOut } from './types'
+import type { AnalyzeOut, AppConfig, HistoryEdit, HistoryRow, LogOut, PinStatus, Running, ScreenOut } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -52,6 +52,9 @@ export const api = {
   deleteHistoryMany: (ids: string[]) => request<void>('POST', '/api/history/delete', { ids }),
   historyPdf: (title: 'History' | 'Watchlist', ids: string[]) =>
     send('POST', '/api/history/pdf', { title, ids }).then((r) => r.blob()),
+  progress: () => request<Running>('GET', '/api/progress'),
+  log: () => request<LogOut>('GET', '/api/log'),
+  logCsv: () => send('GET', '/api/log/csv').then((r) => r.blob()),
   watchlist: () => request<string[]>('GET', '/api/watchlist'),
   watch: (ticker: string) => request<string[]>('PUT', `/api/watchlist/${encodeURIComponent(ticker)}`),
   unwatch: (ticker: string) => request<string[]>('DELETE', `/api/watchlist/${encodeURIComponent(ticker)}`),

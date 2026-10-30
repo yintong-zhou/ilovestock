@@ -79,6 +79,33 @@ export interface ScreenOut {
   hits: ScreenHit[]
 }
 
+/** Latest step of a long run (api/app.py ProgressOut). total 0: not known yet. */
+export interface Progress {
+  text: string
+  done: number
+  total: number
+}
+
+export interface Running {
+  screen: Progress | null
+  analyze: Progress | null
+}
+
+/** One row of the error log (src/ilovestock/errorlog.py). */
+export interface LogRow {
+  time: string
+  level: string
+  where: string
+  ticker: string
+  message: string
+  details: string
+}
+
+export interface LogOut {
+  path: string
+  rows: LogRow[] // newest first
+}
+
 /** One saved analysis of one ticker (src/ilovestock/history.py). */
 export interface HistoryRow {
   id: string

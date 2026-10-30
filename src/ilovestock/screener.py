@@ -1,11 +1,11 @@
 """Fundamentals-first screener: loose Finviz pre-filter, then the exact rules of `analyze`."""
 
-from collections.abc import Callable
+import logging
 from dataclasses import dataclass
 from datetime import date
 
 from ilovestock import inputs
-from ilovestock.analysis import fundamental_checks
+from ilovestock.analysis import Progress, fundamental_checks
 from ilovestock.config import Config
 from ilovestock.models import Quality, Status
 from ilovestock.providers import finviz
@@ -17,6 +17,7 @@ MAX_ROWS = 1000  # rows read before the first nano, large/giant included: ~70 pa
 SCREEN_PERIOD = "1y"  # its rules read prices only for the dividends paid in the last 365 days
 DEFAULT_RESULTS = 20
 MAX_RESULTS = inputs.MAX_TICKERS  # the list goes to `analyze`, which takes at most this many
+logger = logging.getLogger(__name__)
 SCREENER_URL = "https://finviz.com/screener.ashx?v=111&f="
 BY_CAP_DESC = "&o=-marketcap"
 
@@ -55,7 +56,9 @@ def screener_url(cfg: Config) -> str:
     return SCREENER_URL + ",".join(finviz_filters(cfg)) + BY_CAP_DESC
 
 
-def candidates(cfg: Config, include_large: bool = False) -> list[str]:
+def candidates(
+    cfg: Config, include_large: bool = False, progress: Progress | None = None
+) -> list[str]:
     """Pre-filter tickers in the micro/small/mid bands of the config, read by market cap descending:
     large and giant are skipped unless `include_large`, the first nano ends the list (no more
     pages are fetched).
@@ -73,9 +76,7 @@ def candidates(cfg: Config, include_large: bool = False) -> list[str]:
                 f"more than {MAX_ROWS} Finviz rows above the nano caps. "
                 "Tighten the fundamental thresholds in the config"
             )
-        if cap is None:
-            continue
-        band = market_cap_band(cap, cfg)
+        band = None if cap is None else market_cap_band(cap, cfg)
         if band == "nano":
             break
         if band in bands:
@@ -87,6 +88,8 @@ def candidates(cfg: Config, include_large: bool = False) -> list[str]:
                 f"Tighten the fundamental thresholds or raise {key} in the config (Settings)"
                 + (yoy if cfg.growth_basis == "qoq" else "")
             )
+        if progress:  # the total is known only at the first nano
+            progress(f"Reading the Finviz screener: {i} rows, {len(tickers)} candidates", 0, 0)
     return tickers
 
 
@@ -113,32 +116,37 @@ def screen(
     cfg: Config,
     today: date,
     max_results: int = DEFAULT_RESULTS,
-    progress: Callable[[str], None] | None = None,
+    progress: Progress | None = None,
     include_large: bool = False,
 ) -> ScreenResult:
     """With `include_large`, large and giant caps are searched and the Market cap rule is skipped:
     `analyze` still fails them on it (user's decision)."""
-    tickers = candidates(cfg, include_large)
+    tickers = candidates(cfg, include_large, progress)
+    n = len(tickers)
     passed: list[tuple[str, str | None, Quality]] = []
     errors = []
-    for t in tickers:
+    for i, t in enumerate(tickers):
         if progress:
-            progress(t)
+            progress(f"Checking fundamentals: {t} ({i + 1} of {n})", i, n)
         try:
             fund = provider.fundamentals(t)
             if fund.note:  # a source failed (e.g. Finviz 429): a fetch error, not a failed rule
+                logger.warning("Skipped: %s", fund.note, extra={"ticker": t})
                 errors.append(t)
                 continue
             daily = provider.history(t, SCREEN_PERIOD)
             fund_results, earn = fundamental_checks(fund, daily, cfg, today)
             q = quality(fund)
         except Exception:  # unofficial sources: skip the ticker, keep the search going
+            logger.warning("Skipped: data error", exc_info=True, extra={"ticker": t})
             errors.append(t)
             continue
         checked = [c for c in fund_results if not (include_large and c.name == "Market cap")]
         if all(c.status == Status.PASS for c in [*checked, earn]):
             cap = next((c.value for c in fund_results if c.name == "Market cap"), None)
             passed.append((t, cap, q))
+    if progress:
+        progress("Ranking by quality", n, n)
     qs = [q for _, _, q in passed]
     roic_ranks, margin_ranks = (
         ranks([q.roic_pct for q in qs]),
