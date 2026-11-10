@@ -79,11 +79,14 @@ export interface ScreenOut {
   hits: ScreenHit[]
 }
 
-/** Latest step of a long run (api/app.py ProgressOut). total 0: not known yet. */
+/** Latest step of a long run. total 0: unknown; started_at: epoch seconds;
+ * eta_seconds: null until it can be estimated. */
 export interface Progress {
   text: string
   done: number
   total: number
+  started_at: number
+  eta_seconds: number | null
 }
 
 export interface Running {

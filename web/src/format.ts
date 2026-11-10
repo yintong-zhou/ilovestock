@@ -2,6 +2,14 @@ import type { MouseEvent } from 'react'
 
 import type { CriterionResult, HistoryRow, Quality } from './types'
 
+/** Format elapsed or remaining seconds as a compact duration. */
+export function duration(seconds: number): string {
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
+}
+
 /** Row click handler that does what the row's ticker link or button does. The ticker stays the
  * keyboard target; clicks on other controls and text selections are left alone. */
 export function rowClick(action: () => void) {
