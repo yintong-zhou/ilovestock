@@ -369,8 +369,9 @@ def test_progress_timing_and_phase_changes(tmp_path, monkeypatch):
 
         snapshot("reading", 0, 0, 0)
         snapshot("checking", 1, 10, 100)
-        wall[0] = 9000.0  # system clock changes do not affect the estimate
         snapshot("checking", 2, 10, 110)
+        wall[0] = 9000.0  # system clock changes do not affect the estimate
+        seen.append(c.get("/api/progress").json()["screen"])
         snapshot("new total", 2, 20, 200)
         snapshot("new total", 4, 20, 220)
         snapshot("reading again", 0, 0, 300)
@@ -380,7 +381,7 @@ def test_progress_timing_and_phase_changes(tmp_path, monkeypatch):
     monkeypatch.setattr(screener, "candidates", candidates)
     assert c.post("/api/screen", json={}).status_code == 200
     assert all(item["started_at"] == 1000.0 for item in seen)
-    assert [item["eta_seconds"] for item in seen] == [None, None, 40, 0, 80, None, 0]
+    assert [item["eta_seconds"] for item in seen] == [None, None, 40, 40, 0, 80, None, 0]
     assert all(set(item) == {"text", "done", "total", "started_at", "eta_seconds"} for item in seen)
     assert c.get("/api/progress").json() == IDLE
 
