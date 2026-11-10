@@ -17,7 +17,7 @@ from ilovestock.providers.finviz import FinvizProvider
 from ilovestock.providers.yahoo import YahooProvider
 
 
-def make_client(tmp_path, provider=None):
+def make_client(tmp_path, provider=None, **app_options):
     app = create_app(
         pin_path=tmp_path / "pin.json",
         config_path=tmp_path / "config.toml",
@@ -26,6 +26,7 @@ def make_client(tmp_path, provider=None):
         history_path=tmp_path / "history.csv",
         watchlist_path=tmp_path / "watchlist.txt",
         log_path=tmp_path / "log.csv",
+        **app_options,
     )
     c = TestClient(app, base_url="http://127.0.0.1")
     c.pin_path = tmp_path / "pin.json"
@@ -354,29 +355,44 @@ def test_progress_during_screen(tmp_path, monkeypatch):
     assert seen == ["Checking fundamentals: A (1 of 1)"]
 
 
-def test_progress_timing(client, monkeypatch):
-    unlocked(client)
-    times = iter([10.0, 11.0, 15.0])
-
-    class Clock:
-        time = staticmethod(lambda: 1000.0)
-        monotonic = staticmethod(lambda: next(times, 15.0))
-
-    monkeypatch.setattr("ilovestock.api.app.time", Clock)
+def test_progress_timing_and_phase_changes(tmp_path, monkeypatch):
+    now = [0.0]
+    wall = [1000.0]
     seen = []
+    c = unlocked(make_client(tmp_path, clock=lambda: now[0], wall=lambda: wall[0]))
 
     def candidates(cfg, include_large=False, progress=None):
-        progress("Starting", 0, 4)
-        seen.append(client.app.state.running["screen"].model_dump())
-        progress("Checking", 1, 4)
-        seen.append(client.app.state.running["screen"].model_dump())
+        def snapshot(text, done, total, at):
+            now[0] = at
+            progress(text, done, total)
+            seen.append(c.get("/api/progress").json()["screen"])
+
+        snapshot("reading", 0, 0, 0)
+        snapshot("checking", 1, 10, 100)
+        snapshot("checking", 2, 10, 110)
+        wall[0] = 9000.0  # system clock changes do not affect the estimate
+        seen.append(c.get("/api/progress").json()["screen"])
+        snapshot("new total", 2, 20, 200)
+        snapshot("new total", 4, 20, 220)
+        snapshot("reading again", 0, 0, 300)
+        snapshot("checking again", 2, 10, 400)
         return []
 
     monkeypatch.setattr(screener, "candidates", candidates)
-    assert client.post("/api/screen", json={}).status_code == 200
-    assert seen[0]["started_at"] == seen[1]["started_at"] == 1000.0
-    assert seen[0]["eta_seconds"] is None
-    assert seen[1]["eta_seconds"] == 12.0
+    assert c.post("/api/screen", json={}).status_code == 200
+    assert all(item["started_at"] == 1000.0 for item in seen)
+    assert [item["eta_seconds"] for item in seen] == [None, None, 40, 40, 0, 80, None, 0]
+    assert all(set(item) == {"text", "done", "total", "started_at", "eta_seconds"} for item in seen)
+    assert c.get("/api/progress").json() == IDLE
+
+    seen.clear()
+    assert c.post("/api/screen", json={}).status_code == 200
+    assert all(item["started_at"] == 9000.0 for item in seen)
+
+
+def test_progress_defaults_for_older_payload():
+    step = ProgressOut.model_validate({"text": "waiting", "done": 0, "total": 0})
+    assert step.started_at is None and step.eta_seconds is None
 
 
 def test_short_run_keeps_long_runs_progress(tmp_path, fake_yf, fake_finviz):

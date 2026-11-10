@@ -121,6 +121,7 @@ export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }
       api.progress().then(
         (r) => {
           if (stopped) return
+          setNow(Date.now() / 1000)
           setStep(r[job])
           next(busy || r[job] !== null)
         },

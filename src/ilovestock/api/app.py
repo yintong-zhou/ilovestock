@@ -7,7 +7,7 @@ The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 import logging
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
@@ -17,12 +17,13 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 from ilovestock import config as cfgmod
 from ilovestock import errorlog, history, inputs, pdf, screener, watchlist
 from ilovestock.analysis import Progress, analyze_many
 from ilovestock.api.pin import PinError, PinStore, Sessions, Throttle
+from ilovestock.eta import estimate_eta
 from ilovestock.export import SOURCES, data_date
 from ilovestock.models import DISCLAIMER, CriterionResult, TickerAnalysis, Verdict
 from ilovestock.providers import finviz
@@ -77,8 +78,9 @@ class ProgressOut(BaseModel):
     text: str  # the phase and where it is, e.g. "Checking fundamentals: ABC (12 of 87)"
     done: int
     total: int  # 0: not known yet
-    started_at: float  # Unix epoch seconds
-    eta_seconds: float | None  # null until progress can be measured
+    started_at: float | None = None
+    eta_seconds: float | None = None
+    _phase: tuple[float, int] | None = PrivateAttr(default=None)
 
 
 class Running(BaseModel):
@@ -151,6 +153,8 @@ def create_app(
     history_path: Path | None = None,
     watchlist_path: Path | None = None,
     log_path: Path | None = None,
+    clock: Callable[[], float] = time.monotonic,
+    wall: Callable[[], float] = time.time,
 ) -> FastAPI:
     app = FastAPI(title="ilovestock", description=DISCLAIMER)
     app.add_middleware(
@@ -190,25 +194,18 @@ def create_app(
         """Progress callback for one run. At the end the slot is cleared only if it still holds
         this run's last step: a short Watchlist refresh never wipes a long analysis."""
         last = None
-        started_at = time.time()
-        baseline_time = time.monotonic()
-        baseline_done = 0
-        baseline_total = 0
+        started_at = wall()
+        phase: tuple[float, int] | None = None
 
         def update(text: str, done: int, total: int) -> None:
-            nonlocal last, baseline_time, baseline_done, baseline_total
-            now = time.monotonic()
-            if total != baseline_total or done < baseline_done:
-                baseline_time, baseline_done, baseline_total = now, done, total
-            completed = done - baseline_done
-            eta = (
-                (now - baseline_time) * max(0, total - done) / completed
-                if completed > 0 and total > 0
-                else None
-            )
-            last = running[kind] = ProgressOut(
-                text=text, done=done, total=total, started_at=started_at, eta_seconds=eta
-            )
+            nonlocal last, phase
+            if total == 0:
+                phase = None
+            elif total > 0 and (phase is None or phase[1] != total):
+                phase = (clock(), total)
+            last = ProgressOut(text=text, done=done, total=total, started_at=started_at)
+            last._phase = phase
+            running[kind] = last
 
         try:
             yield update
@@ -349,7 +346,15 @@ def create_app(
 
     @app.get("/api/progress", dependencies=[Depends(session)])
     def progress() -> Running:
-        return Running(**running)
+        def with_eta(step: ProgressOut | None) -> ProgressOut | None:
+            if step is None:
+                return None
+            started = step._phase[0] if step._phase is not None else None
+            return step.model_copy(
+                update={"eta_seconds": estimate_eta(started, clock(), step.done, step.total)}
+            )
+
+        return Running(**{kind: with_eta(step) for kind, step in running.items()})
 
     @app.get("/api/log", dependencies=[Depends(session)])
     def log_rows() -> LogOut:
