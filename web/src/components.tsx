@@ -1,7 +1,7 @@
 import { type ButtonHTMLAttributes, type ReactNode, useEffect, useState } from 'react'
 
 import { api } from './api'
-import { fmt, qualityText } from './format'
+import { fmt, progressLabels, qualityText } from './format'
 import type { CriterionResult, Progress, Quality, Running, Status, TradePlan, Verdict } from './types'
 
 export function PageHeader({ title, aside, children }: { title: string; aside?: ReactNode; children?: ReactNode }) {
@@ -109,6 +109,7 @@ export function Message({ kind, children }: { kind: 'error' | 'info'; children: 
  * once on mount: a run started before the page opened (or left and reopened) shows until it ends. */
 export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }) {
   const [step, setStep] = useState<Progress | null>(null)
+  const [now, setNow] = useState(() => Date.now() / 1000)
 
   useEffect(() => {
     let stopped = false
@@ -133,7 +134,15 @@ export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }
     }
   }, [job, busy])
 
+  const active = step !== null
+  useEffect(() => {
+    if (!active) return
+    const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000)
+    return () => window.clearInterval(timer)
+  }, [active])
+
   if (!step) return null
+  const labels = progressLabels(step, now)
   const pct = step.total ? Math.round((step.done / step.total) * 100) : null
   return (
     <div className="mt-4">
@@ -142,12 +151,16 @@ export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }
         {pct !== null && <span className="font-semibold text-teal-tint">{pct}%</span>}
       </div>
       <div role="progressbar" aria-label={step.text} aria-valuemin={0} aria-valuemax={100}
-        aria-valuenow={pct ?? undefined} className="h-2 overflow-hidden rounded-sm bg-well">
+        aria-valuenow={pct ?? undefined} aria-valuetext={labels.valueText} className="h-2 overflow-hidden rounded-sm bg-well">
         {pct === null ? (
           <div className="h-full w-full animate-pulse bg-teal" /> // total not known yet
         ) : (
           <div className="h-full bg-teal-tint transition-[width] duration-500" style={{ width: `${pct}%` }} />
         )}
+      </div>
+      <div className="mt-2 flex justify-between gap-4 text-sm text-muted">
+        <span>{labels.counter}</span>
+        <span>{labels.timing}</span>
       </div>
     </div>
   )
