@@ -264,4 +264,5 @@ def test_screen_failure_is_logged(offline, monkeypatch, caplog):
 
 def test_screen_max_is_bounded():
     result = runner.invoke(cli.app, ["screen", "--max", "51"])
-    assert result.exit_code == 2 and "1<=x<=50" in result.output
+    assert result.exit_code == 2
+    assert "1<=x<=50" in result.output or "less than or equal to 50" in result.output
