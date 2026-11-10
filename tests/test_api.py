@@ -354,9 +354,36 @@ def test_progress_during_screen(tmp_path, monkeypatch):
     assert seen == ["Checking fundamentals: A (1 of 1)"]
 
 
+def test_progress_timing(client, monkeypatch):
+    unlocked(client)
+    times = iter([10.0, 11.0, 15.0])
+
+    class Clock:
+        time = staticmethod(lambda: 1000.0)
+        monotonic = staticmethod(lambda: next(times, 15.0))
+
+    monkeypatch.setattr("ilovestock.api.app.time", Clock)
+    seen = []
+
+    def candidates(cfg, include_large=False, progress=None):
+        progress("Starting", 0, 4)
+        seen.append(client.app.state.running["screen"].model_dump())
+        progress("Checking", 1, 4)
+        seen.append(client.app.state.running["screen"].model_dump())
+        return []
+
+    monkeypatch.setattr(screener, "candidates", candidates)
+    assert client.post("/api/screen", json={}).status_code == 200
+    assert seen[0]["started_at"] == seen[1]["started_at"] == 1000.0
+    assert seen[0]["eta_seconds"] is None
+    assert seen[1]["eta_seconds"] == 12.0
+
+
 def test_short_run_keeps_long_runs_progress(tmp_path, fake_yf, fake_finviz):
     # a Watchlist refresh ends while a long analysis runs: the long run's step stays on show
-    step = ProgressOut(text="Analyzing A (3 of 40)", done=2, total=40)
+    step = ProgressOut(
+        text="Analyzing A (3 of 40)", done=2, total=40, started_at=123, eta_seconds=None
+    )
 
     class Racing(FinvizProvider):
         def fundamentals(self, t):

@@ -6,6 +6,7 @@ The PIN is set in the terminal by `ilovestock serve`, never over HTTP.
 
 import logging
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -76,6 +77,8 @@ class ProgressOut(BaseModel):
     text: str  # the phase and where it is, e.g. "Checking fundamentals: ABC (12 of 87)"
     done: int
     total: int  # 0: not known yet
+    started_at: float  # Unix epoch seconds
+    eta_seconds: float | None  # null until progress can be measured
 
 
 class Running(BaseModel):
@@ -187,10 +190,25 @@ def create_app(
         """Progress callback for one run. At the end the slot is cleared only if it still holds
         this run's last step: a short Watchlist refresh never wipes a long analysis."""
         last = None
+        started_at = time.time()
+        baseline_time = time.monotonic()
+        baseline_done = 0
+        baseline_total = 0
 
         def update(text: str, done: int, total: int) -> None:
-            nonlocal last
-            last = running[kind] = ProgressOut(text=text, done=done, total=total)
+            nonlocal last, baseline_time, baseline_done, baseline_total
+            now = time.monotonic()
+            if total != baseline_total or done < baseline_done:
+                baseline_time, baseline_done, baseline_total = now, done, total
+            completed = done - baseline_done
+            eta = (
+                (now - baseline_time) * max(0, total - done) / completed
+                if completed > 0 and total > 0
+                else None
+            )
+            last = running[kind] = ProgressOut(
+                text=text, done=done, total=total, started_at=started_at, eta_seconds=eta
+            )
 
         try:
             yield update
