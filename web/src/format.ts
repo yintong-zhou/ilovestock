@@ -1,9 +1,29 @@
 import type { MouseEvent } from 'react'
 
-import type { CriterionResult, HistoryRow, Quality } from './types'
+import type { CriterionResult, HistoryRow, Progress, Quality } from './types'
+
+/** Format elapsed or remaining seconds as a compact duration. */
+export function duration(seconds: number): string {
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
+}
 
 /** Row click handler that does what the row's ticker link or button does. The ticker stays the
  * keyboard target; clicks on other controls and text selections are left alone. */
+export function progressLabels(step: Progress, nowSeconds: number) {
+  const counter = step.total > 0 ? `${step.done} of ${step.total}` : null
+  const eta = step.eta_seconds === null ? null : duration(
+    step.eta_seconds < 60 ? Math.round(step.eta_seconds / 5) * 5 : step.eta_seconds,
+  )
+  return {
+    counter,
+    timing: `Elapsed ${duration(nowSeconds - step.started_at)}${eta === null ? '' : ` · About ${eta} left`}`,
+    valueText: [counter, eta === null ? null : `about ${eta} left`].filter(Boolean).join(', ') || undefined,
+  }
+}
+
 export function rowClick(action: () => void) {
   return (e: MouseEvent) => {
     if ((e.target as Element).closest('a, button, input, select, textarea') || window.getSelection()?.toString()) return
