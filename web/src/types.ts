@@ -84,6 +84,8 @@ export interface Progress {
   text: string
   done: number
   total: number
+  started_at?: number | null
+  eta_seconds?: number | null
 }
 
 export interface Running {

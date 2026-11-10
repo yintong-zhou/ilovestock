@@ -2,6 +2,7 @@ import { type ButtonHTMLAttributes, type ReactNode, useEffect, useState } from '
 
 import { api } from './api'
 import { fmt, qualityText } from './format'
+import { progressDetails } from './progressFormat'
 import type { CriterionResult, Progress, Quality, Running, Status, TradePlan, Verdict } from './types'
 
 export function PageHeader({ title, aside, children }: { title: string; aside?: ReactNode; children?: ReactNode }) {
@@ -109,6 +110,7 @@ export function Message({ kind, children }: { kind: 'error' | 'info'; children: 
  * once on mount: a run started before the page opened (or left and reopened) shows until it ends. */
 export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }) {
   const [step, setStep] = useState<Progress | null>(null)
+  const [now, setNow] = useState(0)
 
   useEffect(() => {
     let stopped = false
@@ -120,6 +122,7 @@ export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }
       api.progress().then(
         (r) => {
           if (stopped) return
+          setNow(Date.now() / 1000)
           setStep(r[job])
           next(busy || r[job] !== null)
         },
@@ -149,6 +152,7 @@ export function JobProgress({ job, busy }: { job: keyof Running; busy: boolean }
           <div className="h-full bg-teal-tint transition-[width] duration-500" style={{ width: `${pct}%` }} />
         )}
       </div>
+      <p className="mt-2 text-sm text-muted">{progressDetails(step, now)}</p>
     </div>
   )
 }
