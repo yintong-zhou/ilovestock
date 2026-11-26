@@ -70,20 +70,20 @@ function Hero() {
 }
 
 const FUNDAMENTALS = [
-  ['Sales and EPS growth', 'above 20% and 15% quarter on quarter, or year on year if you choose'],
-  ['Return on equity', 'above 15%'],
-  ['Institutional ownership', 'below 80%, with net institutional buying'],
-  ['Dividend', 'none paid over the last 12 months'],
-  ['Market cap', 'micro, small or mid; nano and large fail'],
-  ['Next earnings report', 'more than 10 days away, and the market has reacted to the last one'],
+  ['Sales and earnings growth', 'is the business growing'],
+  ['Return on equity', 'how well it turns capital into profit'],
+  ['Institutional ownership', 'who holds it, and whether they are buying'],
+  ['Dividend', 'whether profit is paid out or reinvested'],
+  ['Market capitalization', 'the size of the company'],
+  ['Earnings calendar', 'how close the next report is, and how the market took the last one'],
 ]
 const TECHNICALS = [
-  ['Relative strength', 'the stock against the S&P 500 stays above its 52-week average'],
-  ['Donchian 10 weeks', 'a weekly close above the upper band'],
-  ['Consolidation', 'the base before the breakout corrected less than 50%'],
-  ['Breakout volume', 'the breakout week trades above the 10-week average'],
-  ['DMI / ADX, 18 days', 'ADX rising and below both directional lines'],
-  ['SMA 200 days', 'price above the 200-day average'],
+  ['Relative strength', 'how the stock moves against the S&P 500'],
+  ['Breakout', 'price leaving a period of consolidation'],
+  ['Consolidation', 'how orderly the pause before the move was'],
+  ['Volume', 'whether trading confirms the move'],
+  ['Directional movement', 'the strength and direction of the trend'],
+  ['Long-term trend', 'where the price sits against its long moving average'],
 ]
 
 function Column({ title, question, rows }: { title: string; question: string; rows: string[][] }) {
@@ -116,8 +116,7 @@ function Method() {
         <h2 className={`${h2} max-w-[24ch] text-navy`}>Two questions, asked in this order</h2>
         <p className="mt-4 max-w-[62ch]">
           Fundamentals say whether the company is worth owning. Technicals say whether now is a moment of possible
-          growth. The thresholds below are the defaults and you can edit them. The indicator parameters are fixed and
-          are never options.
+          growth. These are the areas it looks at. The exact rules and values are in the code, not on this page.
         </p>
         <div className="mt-10 grid gap-10 md:grid-cols-2 md:gap-16">
           <Column title="Fundamentals" question="Is the company worth owning?" rows={FUNDAMENTALS} />
@@ -142,14 +141,13 @@ function Plan() {
       <div>
         <h2 className={`${h2} max-w-[24ch] text-navy`}>A BUY comes with the numbers to act on it</h2>
         <p className="mt-4 max-w-[62ch]">
-          The trade plan gives an entry, a technical stop at the low of the base, a take profit in multiples of the
-          risk, and how many shares fit your capital.
+          The trade plan gives an entry, a stop, a take profit and how many shares fit your capital.
         </p>
         <ul className="mt-6 max-w-[62ch] space-y-2">
           {[
-            'A risk above 2% of capital per trade is rejected.',
-            'A trade with a reward under 2 times the risk is discarded.',
-            'One stock never weighs more than 10% of the portfolio.',
+            'Risk per trade is capped, and a riskier setting is rejected.',
+            'A trade whose reward does not clearly beat its risk is discarded.',
+            'No single stock can take over the portfolio.',
           ].map((t) => (
             <li key={t} className="flex gap-2">
               <svg aria-hidden viewBox="0 0 20 20" className="mt-1.5 size-4 shrink-0 text-teal">
@@ -173,13 +171,12 @@ function Screener() {
         <div>
           <h2 className={`${h2} max-w-[24ch] text-navy`}>Start from the companies, then check the chart</h2>
           <p className="mt-4 max-w-[62ch]">
-            The screener builds a Finviz query from your thresholds, then applies the exact fundamental rules to every
-            candidate. Only stocks where every criterion passes are listed, ready for the full analysis.
+            The screener starts from the fundamentals and checks every candidate with the same rules as the full analysis.
+            Only stocks where every criterion passes are listed, ready for the technical check.
           </p>
           <p className="mt-4 max-w-[62ch]">
-            They are ranked by a quality score: the average of two percentiles, ROIC and the one-year change in
-            operating margin. Growth alone says nothing about profit. The score is informational and never changes a
-            verdict.
+            They are ranked by a quality score built from profitability and the trend of operating margin. Growth
+            alone says nothing about profit. The score is informational and never changes a verdict.
           </p>
         </div>
         <figure>
@@ -219,7 +216,7 @@ function Screener() {
             </tbody>
           </table>
           <figcaption className="mt-2 text-sm text-muted">
-            Illustrative values. With no ROIC data a stock ranks last on that measure.
+            Illustrative values.
           </figcaption>
         </figure>
       </div>
@@ -342,8 +339,8 @@ const LIMITS = [
   ],
   ['US stocks, USD only', 'NASDAQ, NYSE and AMEX. Prices quoted in another currency are rejected.'],
   [
-    'Built for micro to mid caps',
-    'Large and giant caps always fail the market cap rule, so their verdict stays NO-BUY.',
+    'Built for smaller companies',
+    'The method targets smaller companies, so the biggest stocks will not get a BUY.',
   ],
   ['Open source, GPL-3.0', 'You can read every rule in the code.'],
 ]

@@ -15,5 +15,5 @@ npm run lint && npm run build   # tsc + vite build into dist/
 Import the repository, set **Root Directory** to `landing`. Vercel detects Vite: build command
 `npm run build`, output directory `dist`. No environment variables.
 
-All figures on the page are illustrative and labelled as such; the rule names and thresholds are the
-defaults of `src/ilovestock/config.py`. Update them if those defaults change.
+All figures on the page are illustrative and labelled as such. The page names the areas analysed but never
+publishes thresholds or indicator parameters: keep it that way when editing the copy.

@@ -17,7 +17,8 @@ Sito pubblico di presentazione del prodotto, da pubblicare su Vercel, quindi sta
 
 - Funziona: `landing/` completa (hero con pannello verdetto animato, metodo, trade plan con grafico che si disegna, screener, modi d'uso con blocco di installazione, fascia "What it does not do", footer). `npm run lint` e `npm run build` passano.
 - Verificato con screenshot reali (desktop 1360 px, mobile 390 px) tramite Chrome DevTools Protocol: sequenza del pannello, toggle tra i due campioni, grafico, layout mobile.
-- **Nulla è stato committato né pushato.** Il branch `feat/landing-page` esiste, i file sono untracked (`landing/`) più la modifica a `.gitignore`.
+- **Push annullato (2026-11-26)**: il commit iniziale era stato pushato, poi il branch remoto è stato cancellato e il commit annullato in locale, perché la prima versione pubblicava soglie e parametri della strategia. Il copy è stato poi generalizzato (solo aree analizzate).
+- **Al momento nulla è committato né pushato.** Il branch `feat/landing-page` esiste, i file sono untracked (`landing/`) più la modifica a `.gitignore`.
 - Non fatto: deploy reale su Vercel, test di `prefers-reduced-motion`, job CI per `landing/`, test Lighthouse/accessibilità automatici.
 
 ## Cosa abbiamo provato che NON ha funzionato
@@ -39,7 +40,7 @@ Sito pubblico di presentazione del prodotto, da pubblicare su Vercel, quindi sta
 - **Copy in inglese**, come README e app: scartato l'italiano perché il prodotto e il pubblico US-stocks sono in inglese (da confermare con l'utente).
 - **Tema chiaro (#EEF3F6) con pannello verdetto scuro e fascia Limits scura**: scartata una pagina tutta scura/crema+terracotta (default "da AI"); il brand chiede "trustworthy".
 - **Limiti con lo stesso peso dei benefici** (fascia a tutta larghezza, non fine print): imposto dal brand ("Show fees, risks, and terms with the same visual weight as benefits").
-- **Valori illustrativi dichiarati come tali** (ticker `SMPL`/`DEMO`, "Company A–E"): scartati ticker reali per non far sembrare una raccomandazione; nomi e soglie dei criteri sono invece quelli reali di `src/ilovestock/config.py`.
+- **Valori illustrativi dichiarati come tali (ticker fittizi, nessuna soglia)** (ticker `SMPL`/`DEMO`, "Company A–E"): scartati ticker reali per non far sembrare una raccomandazione; nessuna soglia reale è riportata.
 - **Motion solo dove risponde a un'azione o racconta qualcosa**: sequenza hero, toggle con `layoutId`, grafico al primo ingresso in viewport, barre del ranking, feedback "Copied". Scartati fade-in per ogni sezione. `MotionConfig reducedMotion="user"` più `useReducedMotion` per `pathLength`/delay.
 - **Niente commit e niente modifica a `ci.yml`**: non richiesti; CLAUDE.md dice di chiedere per cose fuori scopo.
 
@@ -65,8 +66,7 @@ Sito pubblico di presentazione del prodotto, da pubblicare su Vercel, quindi sta
 
 ## Da sapere prima di toccare qualcosa
 
-- Sulle regole del progetto: non sono richieste richieste live a Finviz/Yahoo per questo lavoro; la landing è statica e non chiama il core né l'API.
-- I numeri sulla pagina devono restare coerenti: entry 12.40, stop 11.55, target 14.95 = entry + 3R (R = 0.85); 161 azioni = tetto 10% di 20.000 $ (la regola del rischio 1% ne permetterebbe 235). Se cambi uno, ricalcola gli altri in `data.ts` e nella frase in `Verdict.tsx`.
-- Ranking di qualità: percentili su 5 titoli = 100/75/50/25/0, punteggio = media dei due; N/D è peggiore. I valori in `RANKING` sono già coerenti con questa regola.
+- Non servono richieste live a Finviz/Yahoo per questo lavoro; la landing è statica e non chiama il core né l'API.
+- **Regola di pubblicazione**: la pagina nomina solo le aree analizzate e non pubblica soglie né parametri degli indicatori (né il metodo del punteggio di qualità, né i limiti di rischio esatti). Valori e numeri sono illustrativi; non reintrodurre dettagli della strategia nel copy.
 - Su Windows lo screenshot con Chrome richiede il path `C:/Program Files/Google/Chrome/Application/chrome.exe`; usare il server su `http://localhost:4173` (non `127.0.0.1`: ascolta solo su localhost).
 - Il pannello hero usa `key` per rimontare la lista e rifare la sequenza al cambio campione: non rimuoverlo.

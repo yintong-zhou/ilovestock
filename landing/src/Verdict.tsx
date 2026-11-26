@@ -59,7 +59,6 @@ export default function Verdict() {
           >
             <span>
               {r.name}
-              <span className="block text-sm text-soft sm:ml-2 sm:inline">{r.rule}</span>
             </span>
             <span className="text-right sm:order-none">{r.value}</span>
             <span className="relative h-6">
@@ -110,7 +109,7 @@ export default function Verdict() {
             {[
               ['Entry', PLAN.entry.toFixed(2)],
               ['Stop', PLAN.stop.toFixed(2)],
-              ['Target (3R)', PLAN.target.toFixed(2)],
+              ['Target', PLAN.target.toFixed(2)],
               ['Shares', String(PLAN.shares)],
             ].map(([k, v]) => (
               <div key={k}>
@@ -127,11 +126,6 @@ export default function Verdict() {
               </li>
             ))}
           </ul>
-        )}
-        {s.buy && (
-          <p className="mt-4 text-sm text-soft">
-            161 shares: capped at 10% of a $20,000 portfolio, below the 235 the 1% risk limit would allow.
-          </p>
         )}
       </motion.footer>
     </section>

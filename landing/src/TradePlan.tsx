@@ -8,10 +8,10 @@ const X1 = 456
 const y = (p: number) => 340 - (p - 8.4) * 46 // 8.60 -> 331, 14.95 -> 39
 const x = (n: number) => X0 + (n * (X1 - X0)) / (CLOSES.length - 1)
 const LINE = CLOSES.map((c, n) => `${n ? 'L' : 'M'}${x(n).toFixed(1)} ${y(c).toFixed(1)}`).join(' ')
-const BASE_FROM = CLOSES.length - 11 // the 10 weeks before the breakout week
+const BASE_FROM = CLOSES.length - 11 // the weeks before the breakout
 
 const LEVELS = [
-  { label: `Target ${PLAN.target.toFixed(2)} (3R)`, p: PLAN.target, color: 'var(--color-green)', text: 'var(--color-green-ink)' },
+  { label: `Target ${PLAN.target.toFixed(2)}`, p: PLAN.target, color: 'var(--color-green)', text: 'var(--color-green-ink)' },
   { label: `Entry ${PLAN.entry.toFixed(2)}`, p: PLAN.entry, color: 'var(--color-navy)', text: 'var(--color-navy)' },
   { label: `Stop ${PLAN.stop.toFixed(2)}`, p: PLAN.stop, color: '#b3392d', text: '#b3392d' },
 ]
@@ -29,7 +29,7 @@ export default function TradePlan() {
         ref={ref}
         viewBox="0 0 640 350"
         role="img"
-        aria-label="Illustrative weekly price chart: a run-up, a ten week base and a breakout, with entry at 12.40, stop at 11.55 and a 3R target at 14.95."
+        aria-label="Illustrative weekly price chart: a run-up, a pause and a breakout, with entry at 12.40, stop at 11.55 and a target at 14.60."
         className="h-auto w-full"
       >
         <motion.rect
@@ -120,11 +120,11 @@ export default function TradePlan() {
           animate={{ opacity: go ? 1 : 0 }}
           transition={tr(1.4, 0.4)}
         >
-          10-week base
+          Base
         </motion.text>
       </svg>
       <figcaption className="mt-2 text-sm text-muted">
-        Illustrative weekly closes, not a real stock. Stop = lowest low of the base; target = entry + 3 x (entry - stop).
+        Illustrative weekly closes, not a real stock.
       </figcaption>
     </figure>
   )
