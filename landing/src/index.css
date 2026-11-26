@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* Brand palette (../../brand-guidelines.md). Tints marked "derived" keep text contrast >= 4.5:1. */
+@theme {
+  --color-ink: #16232e; /* brand dark neutral */
+  --color-mist: #eef3f6; /* brand light neutral */
+  --color-navy: #0b3d62; /* brand primary */
+  --color-teal: #1f6f8b; /* brand secondary */
+  --color-green: #2e9e5b; /* brand accent: fills */
+  --color-green-ink: #1c7a42; /* derived: accent as text on light */
+  --color-muted: #4a5d6b; /* derived: secondary text on light */
+  --color-rule: #cbd9e1; /* derived: hairlines on light */
+
+  /* dark panel (same derived tints as the web app) */
+  --color-panel: #1b2a36;
+  --color-well: #121d26;
+  --color-edge: #2a3b48;
+  --color-soft: #9aabb8;
+  --color-pass: #52bf7f;
+  --color-fail: #e2786c;
+  --color-nd: #d9b04f;
+  --color-sky: #7cc1d9;
+
+  --font-heading: "Merriweather", Georgia, serif;
+  --font-sans: "Source Sans 3", system-ui, sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 24px;
+  }
+
+  body {
+    @apply bg-mist font-sans text-base leading-relaxed text-ink antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-heading font-bold;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
